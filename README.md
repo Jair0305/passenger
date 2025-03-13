@@ -1,103 +1,113 @@
-# Passenger - Generador de Pases Digitales para Apple Wallet
+# Apple Wallet Pass Generator
 
-Esta aplicación te permite crear pases digitales para Apple Wallet utilizando tus certificados de Apple Developer.
+A Next.js application for generating Apple Wallet passes using the passkit-generator library.
 
-## Requisitos Previos
+## Features
 
-Para utilizar esta aplicación, necesitas:
+- Generate Apple Wallet passes with custom data
+- Support for different pass types (generic, eventTicket, etc.)
+- Customizable fields, colors, and barcodes
+- API endpoint for pass generation
 
-1. Una cuenta de Apple Developer
-2. Certificados de Apple Developer para la creación de pases digitales
-3. Node.js 18.0.0 o superior
+## Prerequisites
 
-## Configuración de Certificados
+- Node.js 18.x or higher
+- Apple Developer Account with Pass Type ID certificate
+- PEM files for certificate validation
 
-La aplicación espera encontrar los siguientes archivos en la carpeta `appledeveloper`:
+## Setup
 
-- `Certificates.p12`: Tu certificado P12 exportado desde Keychain Access
-- `pass.cer`: Tu certificado de tipo de pase descargado desde Apple Developer Portal
+1. Clone the repository:
 
-### Obtener los Certificados
-
-1. Inicia sesión en [Apple Developer Portal](https://developer.apple.com)
-2. Ve a "Certificates, Identifiers & Profiles"
-3. Crea un nuevo "Pass Type ID" en la sección "Identifiers"
-4. Genera un certificado para ese Pass Type ID
-5. Descarga e instala el certificado en tu Keychain Access
-6. Exporta el certificado como archivo .p12 (asegúrate de recordar la contraseña)
-7. Coloca los archivos en la carpeta `appledeveloper`
-
-## Configuración de Variables de Entorno
-
-Crea un archivo `.env.local` con las siguientes variables:
-
-```env
-# Contraseña del certificado P12 (si es necesaria)
-P12_PASSWORD=tu_contraseña
-
-# ID del equipo de Apple Developer
-APPLE_TEAM_ID=tu_team_id
-
-# ID del tipo de pase
-PASS_TYPE_IDENTIFIER=pass.com.tuempresa.passenger
+```bash
+git clone <repository-url>
+cd passenger
 ```
 
-## Instalación
+2. Install dependencies:
 
 ```bash
 npm install
-# o
-yarn install
-# o
-pnpm install
-# o
-bun install
 ```
 
-## Desarrollo
+3. Set up environment variables in `.env.local`:
+
+```
+APPLE_TEAM_ID=<your-team-id>
+PASS_TYPE_IDENTIFIER=<your-pass-type-identifier>
+SIGNER_KEY_PASSPHRASE=<your-signer-key-passphrase>
+```
+
+4. Add your certificates to the `certificates` directory:
+   - `wwdr.pem` - Apple Worldwide Developer Relations Certificate
+   - `signerCert.pem` - Your Pass Type ID Certificate
+   - `signerKey.pem` - Your private key
+
+## Development
+
+Run the development server:
 
 ```bash
 npm run dev
-# o
-yarn dev
-# o
-pnpm dev
-# o
-bun dev
 ```
 
-Abre [http://localhost:3000](http://localhost:3000) en tu navegador para ver la aplicación.
+Open [http://localhost:3000/test](http://localhost:3000/test) to access the test page for generating passes.
 
-## Uso
+## Generating a Pass
 
-1. Completa los campos del formulario para personalizar tu pase digital
-2. Visualiza la vista previa en tiempo real
-3. Haz clic en "Descargar Pase Digital (.pkpass)" para generar y descargar el pase
-4. Abre el archivo .pkpass en tu dispositivo iOS para añadirlo a Apple Wallet
+You can generate a pass by making a POST request to the `/api/passes` endpoint with the following data structure:
 
-## Tecnologías Utilizadas
+```json
+{
+  "passType": "generic",
+  "passData": {
+    "title": "Test Pass",
+    "subtitle": "Subtitle",
+    "description": "Test Pass Description",
+    "logoText": "Test Company",
+    "organizationName": "Test Organization",
 
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-- pkpass (para la generación de pases digitales)
+    "primaryColor": "#FF0000",
+    "secondaryColor": "#0000FF",
+    "backgroundColor": "#FFFFFF",
+    "foregroundColor": "#000000",
+    "labelColor": "#666666",
 
-## Licencia
+    "location": "Sample Location",
+    "date": "2023-12-31",
+    "time": "14:30",
 
-MIT
+    "barcode": true,
+    "barcodeFormat": "PKBarcodeFormatQR",
+    "barcodeMessage": "TEST-PASS-123456",
+    "notifications": true,
 
-## Learn More
+    "customFields": [
+      {
+        "key": "custom1",
+        "label": "Custom Field 1",
+        "value": "Custom Value 1",
+        "textAlignment": "left"
+      }
+    ]
+  }
+}
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Deployment with Docker
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Build and run the application using Docker:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+docker-compose up -d
+```
 
-## Deploy on Vercel
+## Additional Resources
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- [passkit-generator Documentation](https://github.com/alexandercerutti/passkit-generator/wiki/API-Documentation-Reference)
+- [Apple Wallet Developer Guide](https://developer.apple.com/documentation/walletpasses)
+- [PKPass Validator](https://pkpassvalidator.azurewebsites.net/) - Useful for validating generated passes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+[MIT](LICENSE)

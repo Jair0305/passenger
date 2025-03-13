@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./certificates:/app/certificates
+    environment:
+      - NODE_ENV=production
+      - APPLE_TEAM_ID=${APPLE_TEAM_ID}
+      - PASS_TYPE_IDENTIFIER=${PASS_TYPE_IDENTIFIER}
+      - SIGNER_KEY_PASSPHRASE=${SIGNER_KEY_PASSPHRASE} 

@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
   try {
     // Verificar certificados
     const certStatus = verifyCertificates();
+    console.log('Certificate status:', certStatus);
     if (!certStatus.valid) {
       return NextResponse.json(
         { error: certStatus.message },

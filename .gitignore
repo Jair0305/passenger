@@ -48,6 +48,13 @@ next-env.d.ts
 /appledeveloper/*.certSigningRequest
 /appledeveloper/*.pem
 /appledeveloper/*.key
+/certificates/*
+/certificates
+/certificates/*.p12
+/certificates/*.cer
+/certificates/*.certSigningRequest
+/certificates/*.pem
+/certificates/*.key
 
 # Carpeta temporal para generación de pases
 /temp/
