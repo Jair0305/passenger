@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,8 @@ import { ColorPicker } from "@/components/color-picker"
 import { PassPreview } from "@/components/pass-preview"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Upload, Plus, Trash2 } from "lucide-react"
+import { Upload, Plus, Trash2, ArrowDown, ArrowUp, Image, QrCode, Download } from "lucide-react"
+import { AdvancedPassEditor, PositionableElement } from "@/components/advanced-pass-editor"
 
 // Define un tipo para los campos personalizados
 interface CustomField {
@@ -77,6 +78,14 @@ export function PassCreator() {
     
     // Reverso
     showReverse: false,
+    
+    // Nuevas opciones para personalización avanzada
+    useAdvancedEditor: false,
+    customWidth: 320,
+    customHeight: 480,
+    allowCustomDimensions: true,
+    customPassType: false,
+    allowFullCustomization: false,
   })
   
   // Estados para campos personalizados por sección
@@ -86,7 +95,16 @@ export function PassCreator() {
   const [auxiliaryFields, setAuxiliaryFields] = useState<CustomField[]>([])
   const [backFields, setBackFields] = useState<CustomField[]>([])
 
-  const handleChange = (field: string, value: string | boolean) => {
+  // Estado para editor avanzado
+  const [freeElements, setFreeElements] = useState<PositionableElement[]>([]);
+  const [selectedElement, setSelectedElement] = useState<string | null>(null);
+
+  // Estado para el estado de la generación del pase
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generationError, setGenerationError] = useState<string | null>(null)
+  const [certificateStatus, setCertificateStatus] = useState<{ valid: boolean; message: string } | null>(null)
+
+  const handleChange = (field: string, value: string | boolean | number) => {
     setPassData((prev) => ({ ...prev, [field]: value }))
   }
   
@@ -238,6 +256,88 @@ export function PassCreator() {
         </Button>
       </div>
     )
+  }
+
+  // Función para verificar el estado de los certificados
+  const checkCertificateStatus = async () => {
+    try {
+      const response = await fetch('/api/passes')
+      const data = await response.json()
+      setCertificateStatus(data)
+    } catch (error) {
+      console.error('Error checking certificate status:', error)
+      setCertificateStatus({
+        valid: false,
+        message: 'Error checking certificate status'
+      })
+    }
+  }
+  
+  // Verificar el estado de los certificados al cargar el componente
+  useEffect(() => {
+    checkCertificateStatus()
+  }, [])
+  
+  // Función para generar y descargar el pase
+  const generateAndDownloadPass = async () => {
+    try {
+      setIsGenerating(true)
+      setGenerationError(null)
+      
+      // Preparar los datos del pase
+      const passDataToSend = {
+        ...passData,
+        // Asegurarse de que los campos requeridos estén presentes
+        barcodeMessage: passData.title,
+        barcodeFormat: 'PKBarcodeFormatQR',
+        // Agregar campos personalizados si es necesario
+        customFields: [
+          {
+            key: 'description',
+            label: 'DESCRIPTION',
+            value: passData.description,
+            textAlignment: 'left'
+          }
+        ]
+      }
+      
+      // Enviar la solicitud a la API
+      const response = await fetch('/api/passes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          passType,
+          passData: passDataToSend
+        }),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to generate pass')
+      }
+      
+      // Obtener el blob del pase
+      const passBlob = await response.blob()
+      
+      // Crear un enlace de descarga
+      const downloadUrl = URL.createObjectURL(passBlob)
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = `${passData.title.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.pkpass`
+      document.body.appendChild(a)
+      a.click()
+      
+      // Limpiar
+      URL.revokeObjectURL(downloadUrl)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Error generating pass:', error)
+      setGenerationError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   return (
@@ -722,6 +822,84 @@ export function PassCreator() {
                         onCheckedChange={(checked) => handleChange("showReverse", checked)}
                       />
                     </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="useAdvancedEditor">Usar Editor Avanzado</Label>
+                        <p className="text-xs text-muted-foreground">Habilitar la edición avanzada del pase</p>
+                      </div>
+                      <Switch
+                        id="useAdvancedEditor"
+                        checked={passData.useAdvancedEditor}
+                        onCheckedChange={(checked) => handleChange("useAdvancedEditor", checked)}
+                      />
+                    </div>
+                    
+                    {passData.useAdvancedEditor && (
+                      <AdvancedPassEditor 
+                        backgroundColor={passData.backgroundColor}
+                        width={passData.customWidth} 
+                        height={passData.customHeight} 
+                        elements={freeElements} 
+                        setElements={setFreeElements}
+                        selectedElement={selectedElement} 
+                        setSelectedElement={setSelectedElement} 
+                      />
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label>Ancho Personalizado</Label>
+                      <Input 
+                        type="number" 
+                        value={passData.customWidth} 
+                        onChange={(e) => handleChange("customWidth", Number(e.target.value))}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Altura Personalizada</Label>
+                      <Input 
+                        type="number" 
+                        value={passData.customHeight} 
+                        onChange={(e) => handleChange("customHeight", Number(e.target.value))}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="allowCustomDimensions">Permitir Dimensiones Personalizadas</Label>
+                        <p className="text-xs text-muted-foreground">Permitir al usuario cambiar el tamaño del pase</p>
+                      </div>
+                      <Switch
+                        id="allowCustomDimensions"
+                        checked={passData.allowCustomDimensions}
+                        onCheckedChange={(checked) => handleChange("allowCustomDimensions", checked)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="customPassType">Tipo de Pase Personalizado</Label>
+                        <p className="text-xs text-muted-foreground">Permitir al usuario seleccionar un tipo de pase personalizado</p>
+                      </div>
+                      <Switch
+                        id="customPassType"
+                        checked={passData.customPassType}
+                        onCheckedChange={(checked) => handleChange("customPassType", checked)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="allowFullCustomization">Permitir Personalización Completa</Label>
+                        <p className="text-xs text-muted-foreground">Permitir al usuario personalizar completamente el pase</p>
+                      </div>
+                      <Switch
+                        id="allowFullCustomization"
+                        checked={passData.allowFullCustomization}
+                        onCheckedChange={(checked) => handleChange("allowFullCustomization", checked)}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -763,19 +941,646 @@ export function PassCreator() {
               </TabsContent>
             </Tabs>
 
-            <div className="flex justify-center space-x-4">
-              <Button variant="outline">Guardar Borrador</Button>
-              <Button className="bg-primary hover:bg-primary/90">Crear Pase</Button>
+            <div className="mt-6 flex flex-col gap-4">
+              {certificateStatus && (
+                <div className={`p-4 rounded-md ${certificateStatus.valid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  <p className="text-sm font-medium">
+                    {certificateStatus.valid ? '✅ Certificados de Apple Developer verificados' : `❌ ${certificateStatus.message}`}
+                  </p>
+                </div>
+              )}
+              
+              <Button 
+                onClick={generateAndDownloadPass} 
+                disabled={isGenerating || (certificateStatus ? !certificateStatus.valid : false)}
+                className="w-full"
+              >
+                {isGenerating ? 'Generando...' : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Descargar Pase Digital (.pkpass)
+                  </>
+                )}
+              </Button>
+              
+              {generationError && (
+                <div className="p-4 rounded-md bg-red-100 text-red-800">
+                  <p className="text-sm font-medium">Error: {generationError}</p>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="flex flex-col items-center">
             <h3 className="text-xl font-semibold mb-6">Vista Previa del Pase</h3>
-            <PassPreview passType={passType} passData={passData} />
+            {passData.useAdvancedEditor ? (
+              <div className="space-y-4 w-full">
+                <div className="flex flex-wrap gap-2 justify-center mb-4">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      const newElement: PositionableElement = {
+                        id: `text_${Date.now()}`,
+                        type: "text",
+                        content: "Texto editable",
+                        x: Math.floor(passData.customWidth / 2) - 50,
+                        y: Math.floor(passData.customHeight / 2) - 10,
+                        width: 100,
+                        height: 20,
+                        rotation: 0,
+                        zIndex: freeElements.length + 1,
+                        styles: {
+                          fontFamily: "Helvetica",
+                          fontSize: 16,
+                          fontWeight: "normal",
+                          color: "#000000",
+                          backgroundColor: "transparent",
+                          borderRadius: 0,
+                          borderWidth: 0,
+                          borderColor: "#000000",
+                          opacity: 1
+                        }
+                      };
+                      setFreeElements([...freeElements, newElement]);
+                      setSelectedElement(newElement.id);
+                    }}
+                  >
+                    Añadir Texto
+                  </Button>
+                  
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      const newElement: PositionableElement = {
+                        id: `image_${Date.now()}`,
+                        type: "image",
+                        content: "",
+                        x: Math.floor(passData.customWidth / 2) - 50,
+                        y: Math.floor(passData.customHeight / 2) - 50,
+                        width: 100,
+                        height: 100,
+                        rotation: 0,
+                        zIndex: freeElements.length + 1,
+                        styles: {
+                          opacity: 1,
+                          borderRadius: 0,
+                          borderWidth: 0,
+                          borderColor: "#000000",
+                          backgroundColor: "transparent"
+                        }
+                      };
+                      setFreeElements([...freeElements, newElement]);
+                      setSelectedElement(newElement.id);
+                    }}
+                  >
+                    Añadir Imagen
+                  </Button>
+                  
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      const newElement: PositionableElement = {
+                        id: `barcode_${Date.now()}`,
+                        type: "barcode",
+                        content: "https://example.com",
+                        x: Math.floor(passData.customWidth / 2) - 60,
+                        y: Math.floor(passData.customHeight / 2) - 60,
+                        width: 120,
+                        height: 120,
+                        rotation: 0,
+                        zIndex: freeElements.length + 1,
+                        styles: {
+                          opacity: 1,
+                          borderRadius: 0,
+                          borderWidth: 0,
+                          borderColor: "#000000",
+                          backgroundColor: "transparent"
+                        }
+                      };
+                      setFreeElements([...freeElements, newElement]);
+                      setSelectedElement(newElement.id);
+                    }}
+                  >
+                    Añadir Código
+                  </Button>
+                  
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      const newElement: PositionableElement = {
+                        id: `shape_${Date.now()}`,
+                        type: "shape",
+                        content: "",
+                        x: Math.floor(passData.customWidth / 2) - 40,
+                        y: Math.floor(passData.customHeight / 2) - 40,
+                        width: 80,
+                        height: 80,
+                        rotation: 0,
+                        zIndex: freeElements.length + 1,
+                        styles: {
+                          backgroundColor: "#CCCCCC",
+                          borderRadius: 8,
+                          borderWidth: 0,
+                          borderColor: "#000000",
+                          opacity: 0.8
+                        }
+                      };
+                      setFreeElements([...freeElements, newElement]);
+                      setSelectedElement(newElement.id);
+                    }}
+                  >
+                    Añadir Forma
+                  </Button>
+                </div>
+                
+                {selectedElement && (
+                  <Card className="w-full mb-4">
+                    <CardContent className="pt-4 pb-2">
+                      <h4 className="text-sm font-medium mb-3">Editar Elemento</h4>
+                      {freeElements.find(el => el.id === selectedElement)?.type === "text" && (
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label>Texto</Label>
+                            <Textarea 
+                              value={freeElements.find(el => el.id === selectedElement)?.content || ""}
+                              onChange={(e) => {
+                                setFreeElements(
+                                  freeElements.map(el => 
+                                    el.id === selectedElement 
+                                      ? { ...el, content: e.target.value }
+                                      : el
+                                  )
+                                );
+                              }}
+                              rows={2}
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label>Fuente</Label>
+                              <Select 
+                                value={freeElements.find(el => el.id === selectedElement)?.styles.fontFamily || "Helvetica"}
+                                onValueChange={(value) => {
+                                  setFreeElements(
+                                    freeElements.map(el => 
+                                      el.id === selectedElement 
+                                        ? { 
+                                            ...el, 
+                                            styles: { 
+                                              ...el.styles, 
+                                              fontFamily: value 
+                                            } 
+                                          }
+                                        : el
+                                    )
+                                  );
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar fuente" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Helvetica">Helvetica</SelectItem>
+                                  <SelectItem value="Arial">Arial</SelectItem>
+                                  <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                                  <SelectItem value="Courier">Courier</SelectItem>
+                                  <SelectItem value="SF Pro">SF Pro</SelectItem>
+                                  <SelectItem value="Georgia">Georgia</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Tamaño</Label>
+                              <Input 
+                                type="number" 
+                                value={freeElements.find(el => el.id === selectedElement)?.styles.fontSize || 16} 
+                                onChange={(e) => {
+                                  setFreeElements(
+                                    freeElements.map(el => 
+                                      el.id === selectedElement 
+                                        ? { 
+                                            ...el, 
+                                            styles: { 
+                                              ...el.styles, 
+                                              fontSize: Number(e.target.value) 
+                                            } 
+                                          }
+                                        : el
+                                    )
+                                  );
+                                }}
+                                min={8}
+                                max={72}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label>Color de texto</Label>
+                              <ColorPicker
+                                color={freeElements.find(el => el.id === selectedElement)?.styles.color || "#000000"}
+                                onChange={(color) => {
+                                  setFreeElements(
+                                    freeElements.map(el => 
+                                      el.id === selectedElement 
+                                        ? { 
+                                            ...el, 
+                                            styles: { 
+                                              ...el.styles, 
+                                              color 
+                                            } 
+                                          }
+                                        : el
+                                    )
+                                  );
+                                }}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Fondo</Label>
+                              <ColorPicker
+                                color={freeElements.find(el => el.id === selectedElement)?.styles.backgroundColor || "transparent"}
+                                onChange={(color) => {
+                                  setFreeElements(
+                                    freeElements.map(el => 
+                                      el.id === selectedElement 
+                                        ? { 
+                                            ...el, 
+                                            styles: { 
+                                              ...el.styles, 
+                                              backgroundColor: color 
+                                            } 
+                                          }
+                                        : el
+                                    )
+                                  );
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {freeElements.find(el => el.id === selectedElement)?.type === "shape" && (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label>Color de fondo</Label>
+                              <ColorPicker
+                                color={freeElements.find(el => el.id === selectedElement)?.styles.backgroundColor || "#CCCCCC"}
+                                onChange={(color) => {
+                                  setFreeElements(
+                                    freeElements.map(el => 
+                                      el.id === selectedElement 
+                                        ? { 
+                                            ...el, 
+                                            styles: { 
+                                              ...el.styles, 
+                                              backgroundColor: color 
+                                            } 
+                                          }
+                                        : el
+                                    )
+                                  );
+                                }}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Borde redondeado</Label>
+                              <Input 
+                                type="number" 
+                                value={freeElements.find(el => el.id === selectedElement)?.styles.borderRadius || 0} 
+                                onChange={(e) => {
+                                  setFreeElements(
+                                    freeElements.map(el => 
+                                      el.id === selectedElement 
+                                        ? { 
+                                            ...el, 
+                                            styles: { 
+                                              ...el.styles, 
+                                              borderRadius: Number(e.target.value) 
+                                            } 
+                                          }
+                                        : el
+                                    )
+                                  );
+                                }}
+                                min={0}
+                                max={100}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label>Opacidad</Label>
+                              <Input 
+                                type="range" 
+                                value={freeElements.find(el => el.id === selectedElement)?.styles.opacity || 1} 
+                                onChange={(e) => {
+                                  setFreeElements(
+                                    freeElements.map(el => 
+                                      el.id === selectedElement 
+                                        ? { 
+                                            ...el, 
+                                            styles: { 
+                                              ...el.styles, 
+                                              opacity: Number(e.target.value) 
+                                            } 
+                                          }
+                                        : el
+                                    )
+                                  );
+                                }}
+                                min={0}
+                                max={1}
+                                step={0.05}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {freeElements.find(el => el.id === selectedElement)?.type === "barcode" && (
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label>Contenido del código</Label>
+                            <Textarea 
+                              value={freeElements.find(el => el.id === selectedElement)?.content || ""}
+                              onChange={(e) => {
+                                setFreeElements(
+                                  freeElements.map(el => 
+                                    el.id === selectedElement 
+                                      ? { ...el, content: e.target.value }
+                                      : el
+                                  )
+                                );
+                              }}
+                              rows={2}
+                              placeholder="URL o texto para el código"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>Tipo de código</Label>
+                            <Select 
+                              defaultValue="qr"
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar tipo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="qr">QR Code</SelectItem>
+                                <SelectItem value="pdf417">PDF417</SelectItem>
+                                <SelectItem value="aztec">Aztec</SelectItem>
+                                <SelectItem value="code128">Code 128</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {freeElements.find(el => el.id === selectedElement)?.type === "image" && (
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label>URL de la imagen</Label>
+                            <Input 
+                              placeholder="https://ejemplo.com/imagen.jpg" 
+                              value={freeElements.find(el => el.id === selectedElement)?.content || ""}
+                              onChange={(e) => {
+                                setFreeElements(
+                                  freeElements.map(el => 
+                                    el.id === selectedElement 
+                                      ? { ...el, content: e.target.value }
+                                      : el
+                                  )
+                                );
+                              }}
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>Subir imagen</Label>
+                            <Button variant="outline" className="w-full">
+                              <Upload className="mr-2 h-4 w-4" />
+                              Seleccionar archivo
+                            </Button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label>Borde redondeado</Label>
+                              <Input 
+                                type="number" 
+                                value={freeElements.find(el => el.id === selectedElement)?.styles.borderRadius || 0} 
+                                onChange={(e) => {
+                                  setFreeElements(
+                                    freeElements.map(el => 
+                                      el.id === selectedElement 
+                                        ? { 
+                                            ...el, 
+                                            styles: { 
+                                              ...el.styles, 
+                                              borderRadius: Number(e.target.value) 
+                                            } 
+                                          }
+                                        : el
+                                    )
+                                  );
+                                }}
+                                min={0}
+                                max={100}
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Opacidad</Label>
+                              <Input 
+                                type="range" 
+                                value={freeElements.find(el => el.id === selectedElement)?.styles.opacity || 1} 
+                                onChange={(e) => {
+                                  setFreeElements(
+                                    freeElements.map(el => 
+                                      el.id === selectedElement 
+                                        ? { 
+                                            ...el, 
+                                            styles: { 
+                                              ...el.styles, 
+                                              opacity: Number(e.target.value) 
+                                            } 
+                                          }
+                                        : el
+                                    )
+                                  );
+                                }}
+                                min={0}
+                                max={1}
+                                step={0.05}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="mt-4 flex justify-between items-center">
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => {
+                            setFreeElements(freeElements.filter(el => el.id !== selectedElement));
+                            setSelectedElement(null);
+                          }}
+                        >
+                          <Trash2 className="mr-1 h-4 w-4" />
+                          Eliminar
+                        </Button>
+                        
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                              setFreeElements(
+                                freeElements.map(el => {
+                                  if (el.id === selectedElement) {
+                                    return {
+                                      ...el,
+                                      zIndex: Math.max(1, el.zIndex - 1)
+                                    };
+                                  }
+                                  return el;
+                                })
+                              );
+                            }}
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                          
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setFreeElements(
+                                freeElements.map(el => {
+                                  if (el.id === selectedElement) {
+                                    return {
+                                      ...el,
+                                      zIndex: el.zIndex + 1
+                                    };
+                                  }
+                                  return el;
+                                })
+                              );
+                            }}
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedElement(null);
+                            }}
+                          >
+                            Listo
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                <div 
+                  className="border rounded-md overflow-hidden shadow-md relative mx-auto"
+                  style={{ 
+                    width: `${passData.customWidth}px`, 
+                    height: `${passData.customHeight}px`,
+                    backgroundColor: passData.backgroundColor,
+                    maxWidth: '100%',
+                    maxHeight: '600px'
+                  }}
+                >
+                  {freeElements.map((element) => (
+                    <div
+                      key={element.id}
+                      className={`absolute ${selectedElement === element.id ? 'ring-2 ring-blue-500' : ''}`}
+                      style={{
+                        left: `${element.x}px`,
+                        top: `${element.y}px`,
+                        width: `${element.width}px`,
+                        height: `${element.height}px`,
+                        transform: `rotate(${element.rotation}deg)`,
+                        zIndex: element.zIndex,
+                        backgroundColor: element.styles.backgroundColor,
+                        borderRadius: `${element.styles.borderRadius}px`,
+                        border: element.styles.borderWidth 
+                          ? `${element.styles.borderWidth}px solid ${element.styles.borderColor}` 
+                          : 'none',
+                        opacity: element.styles.opacity,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setSelectedElement(element.id)}
+                    >
+                      {element.type === 'text' && (
+                        <p
+                          style={{
+                            fontFamily: element.styles.fontFamily,
+                            fontSize: `${element.styles.fontSize}px`,
+                            fontWeight: element.styles.fontWeight,
+                            color: element.styles.color,
+                            margin: 0,
+                            padding: '4px',
+                            width: '100%',
+                            height: '100%',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {element.content}
+                        </p>
+                      )}
+                      {element.type === 'image' && (
+                        <div className="w-full h-full">
+                          {element.content ? (
+                            <img 
+                              src={element.content} 
+                              alt="Custom element" 
+                              className="max-w-full max-h-full object-contain" 
+                            />
+                          ) : (
+                            <div className="h-full w-full bg-gray-100 flex items-center justify-center">
+                              <Image className="h-6 w-6 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {element.type === 'barcode' && (
+                        <div className="w-full h-full bg-gray-900 flex items-center justify-center">
+                          <QrCode className="h-6 w-6 text-white" />
+                        </div>
+                      )}
+                      {element.type === 'shape' && (
+                        <div className="w-full h-full" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <PassPreview passType={passType} passData={passData} />
+            )}
           </div>
         </div>
       </div>
     </section>
   )
 }
-
