@@ -34,8 +34,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log(`Generating ${passType} pass with data:`, passData);
+
     // Generar el pase
     const passBuffer = await generatePass(passType, passData);
+
+    console.log("Pass generated successfully, sending response");
 
     // Devolver el pase como un archivo para descargar
     return new NextResponse(passBuffer, {

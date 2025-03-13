@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PKPass } from 'passkit-generator';
 import fs from 'fs';
-import path from 'path';
 import { applePassConfig } from '@/lib/apple-pass-config';
 
 // Interface for custom field
@@ -10,6 +9,31 @@ interface CustomField {
   label: string;
   value: string;
   textAlignment?: 'left' | 'center' | 'right' | 'natural';
+}
+
+// Interfaz para el contenido del pase
+interface PassContent {
+  formatVersion: number;
+  passTypeIdentifier: string;
+  serialNumber: string;
+  teamIdentifier: string;
+  organizationName: string;
+  description: string;
+  logoText: string;
+  foregroundColor: string;
+  backgroundColor: string;
+  labelColor: string;
+  generic: {
+    primaryFields: Array<{key: string, label: string, value: string}>;
+    secondaryFields: Array<{key: string, label: string, value: string}>;
+    auxiliaryFields: Array<{key: string, label: string, value: string}>;
+    backFields: Array<{key: string, label: string, value: string, textAlignment?: string}>;
+  };
+  barcodes?: Array<{
+    message: string;
+    format: string;
+    messageEncoding: string;
+  }>;
 }
 
 export async function POST(request: NextRequest) {
@@ -57,7 +81,7 @@ export async function POST(request: NextRequest) {
     console.log("Certificates loaded, creating pass...");
 
     // Create pass content
-    const passContent = {
+    const passContent: PassContent = {
       formatVersion: 1,
       passTypeIdentifier: applePassConfig.passTypeIdentifier,
       serialNumber: `pass-${Date.now()}`,
@@ -65,9 +89,9 @@ export async function POST(request: NextRequest) {
       organizationName: passData.organizationName || "Generic Organization",
       description: passData.description || "Generic Pass",
       logoText: passData.logoText || "Logo Text",
-      foregroundColor: "rgb(0, 0, 0)",
-      backgroundColor: "rgb(255, 255, 255)",
-      labelColor: "rgb(136, 136, 136)",
+      foregroundColor: passData.foregroundColor || "rgb(0, 0, 0)",
+      backgroundColor: passData.backgroundColor || "rgb(255, 255, 255)", 
+      labelColor: passData.labelColor || "rgb(136, 136, 136)",
       generic: {
         primaryFields: [
           {
@@ -91,15 +115,29 @@ export async function POST(request: NextRequest) {
           }
         ],
         backFields: []
-      },
-      barcodes: [
+      }
+    };
+
+    // Add custom fields if provided
+    if (passData.customFields && Array.isArray(passData.customFields) && passData.customFields.length > 0) {
+      passContent.generic.backFields = passData.customFields.map((field: CustomField) => ({
+        key: field.key,
+        label: field.label,
+        value: field.value,
+        textAlignment: field.textAlignment || 'PKTextAlignmentLeft'
+      }));
+    }
+    
+    // Add barcode if enabled
+    if (passData.barcode) {
+      passContent.barcodes = [
         {
           message: passData.barcodeMessage || "GENERIC-TEST-123",
           format: "PKBarcodeFormatQR",
           messageEncoding: "iso-8859-1"
         }
-      ]
-    };
+      ];
+    }
     
     // Create a new pass
     const pass = new PKPass({}, {

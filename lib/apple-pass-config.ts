@@ -12,7 +12,7 @@ export const applePassConfig = {
   signerKeyPath: path.join(CERTIFICATES_PATH, 'signerKey.pem'),
   
   // Passphrase para signerKey (si es necesaria)
-  signerKeyPassphrase: process.env.SIGNER_KEY_PASSPHRASE || 'passifyeslapolla', // Using 'test' as default from the image
+  signerKeyPassphrase: process.env.SIGNER_KEY_PASSPHRASE || 'passifyeslapolla', // Using default from the image
   
   // ID del equipo de Apple Developer
   teamIdentifier: process.env.APPLE_TEAM_ID || '',
