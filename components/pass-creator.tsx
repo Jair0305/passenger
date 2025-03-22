@@ -136,7 +136,7 @@ export function PassCreator() {
     // Código de barras
     barcode: {
       message: "Executive Engineers Conference",
-      format: "qr",
+      format: "QR",
       messageEncoding: "iso-8859-1"
     },
     notifications: true,
@@ -376,7 +376,7 @@ export function PassCreator() {
       const passDataToSend = {
         ...passData,
         barcodeMessage: passData.barcode.message || "Sample Pass",
-        barcodeFormat: passData.barcode.format || "qr"
+        barcodeFormat: passData.barcode.format || "QR"
       };
 
       // Incluir imágenes codificadas en base64 si existen
@@ -852,7 +852,7 @@ export function PassCreator() {
                             checked={passData.barcode.message !== ""}
                             onCheckedChange={(checked) => {
                               handleChange("barcode.message", checked ? "Executive Engineers Conference" : "");
-                              handleChange("barcode.format", checked ? "qr" : "");
+                              handleChange("barcode.format", checked ? "QR" : "");
                               handleChange("barcode.messageEncoding", checked ? "iso-8859-1" : "");
                             }}
                         />
@@ -865,12 +865,12 @@ export function PassCreator() {
                             <div className="flex items-center space-x-2">
                               <input 
                                 type="radio" 
-                                id="qr" 
-                                value="qr" 
-                                  checked={passData.barcode.format === "qr"}
-                                  onChange={() => handleChange("barcode.format", "qr")}
+                                id="QR" 
+                                value="QR" 
+                                  checked={passData.barcode.format === "QR"}
+                                  onChange={() => handleChange("barcode.format", "QR")}
                               />
-                              <Label htmlFor="qr">QR Code</Label>
+                              <Label htmlFor="QR">QR Code</Label>
                             </div>
                             <div className="flex items-center space-x-2">
                               <input 
