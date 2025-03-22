@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generatePass } from '@/lib/pass-service';
+import { generatePass, PassType } from '@/lib/pass-service';
 import { verifyCertificates } from '@/lib/apple-pass-config';
 import fs from 'fs';
 import path from 'path';
@@ -8,6 +8,18 @@ import path from 'path';
 const tempDir = path.join(process.cwd(), 'temp');
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
+}
+
+// Función para mapear tipos de pases de la interfaz de usuario a los tipos Apple Wallet
+function mapPassType(uiType: string): PassType {
+  switch (uiType.toLowerCase()) {
+    case 'event': return 'eventTicket';
+    case 'boarding': return 'boardingPass'; 
+    case 'coupon': return 'coupon';
+    case 'storecard':
+    case 'loyalty': return 'storeCard';
+    default: return 'generic';
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -24,20 +36,23 @@ export async function POST(request: NextRequest) {
 
     // Obtener datos del pase del cuerpo de la solicitud
     const data = await request.json();
-    const { passType, passData } = data;
+    const { passType: uiPassType, passData } = data;
 
     // Validar datos
-    if (!passType || !passData) {
+    if (!uiPassType || !passData) {
       return NextResponse.json(
         { error: 'Missing required fields: passType or passData' },
         { status: 400 }
       );
     }
 
-    console.log(`Generating ${passType} pass with data:`, passData);
+    // Convertir el tipo de pase de la UI al formato de Apple Wallet
+    const applePKPassType = mapPassType(uiPassType);
+
+    console.log(`Generating ${applePKPassType} pass with data:`, JSON.stringify(passData, null, 2));
 
     // Generar el pase
-    const passBuffer = await generatePass(passType, passData);
+    const passBuffer = await generatePass(applePKPassType, passData);
 
     console.log("Pass generated successfully, sending response");
 

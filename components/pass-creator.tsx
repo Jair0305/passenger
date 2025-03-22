@@ -11,7 +11,7 @@ import { ColorPicker } from "@/components/color-picker"
 import { PassPreview } from "@/components/pass-preview"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Upload, Plus, Trash2, ArrowDown, ArrowUp, Image, QrCode, Download } from "lucide-react"
+import { Upload, Plus, Trash2, Download } from "lucide-react"
 import { AdvancedPassEditor, PositionableElement } from "@/components/advanced-pass-editor"
 
 // Define un tipo para los campos personalizados
@@ -24,68 +24,156 @@ interface CustomField {
 }
 
 // Definir el tipo de pase
-type PassType = "event" | "loyalty" | "coupon" | "boarding" | "generic" | "storeCard";
+type PassType = "event" | "loyalty" | "coupon" | "boarding" | "generic" | "storeCard" | "contact";
+
+interface PassData {
+  title: string;
+  subtitle: string;
+  description: string;
+  logoText: string;
+  organizationName: string;
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor: string;
+  foregroundColor: string;
+  labelColor?: string;
+  logoTextColor?: string;
+  date: string;
+  time: string;
+  location: string;
+  barcode: {
+    message: string;
+    format: string;
+    messageEncoding: string;
+  };
+  headerAlignment: string;
+  primaryAlignment: string;
+  secondaryAlignment: string;
+  auxiliaryAlignment: string;
+  allowFullCustomization: boolean;
+  customization: {
+    enable: boolean;
+    width: string;
+    height: string;
+  };
+  relevantDate: string;
+  expirationDate: string;
+  notifications: boolean;
+  
+  // Configuración de fechas
+  dateStyle?: string;
+  timeStyle?: string;
+  voided?: boolean;
+  
+  // Opciones avanzadas
+  showReverse?: boolean;
+  useAdvancedEditor?: boolean;
+  customWidth?: number;
+  customHeight?: number;
+  allowCustomDimensions?: boolean;
+  customPassType?: boolean;
+
+  // Campos específicos para tipos de pases
+  // Campos para Loyalty Card
+  membershipNumber?: string;
+  balance?: string;
+  
+  // Campos para Cupones
+  discount?: string;
+  
+  // Campos para Boarding Pass
+  flightNumber?: string;
+  gate?: string;
+  seat?: string;
+  boardingTime?: string;
+  
+  // Imágenes (se almacenan como base64 en el frontend)
+  logoImage?: string;
+  iconImage?: string;
+  stripImage?: string;
+  backgroundImage?: string;
+  thumbnailImage?: string;
+  footerImage?: string;
+  
+  // Campos personalizados
+  backFields?: Array<{
+    key: string;
+    label: string;
+    value: string;
+    textAlignment?: string;
+  }>;
+
+  // Campos para Contact Pass
+  contactName?: string;
+  contactPhone?: string; 
+  contactEmail?: string;
+  contactAddress?: string;
+  contactWebsite?: string;
+  contactJob?: string;
+  contactCompany?: string;
+}
 
 export function PassCreator() {
   const [passType, setPassType] = useState<PassType>("event")
-  const [passData, setPassData] = useState({
+  const [passData, setPassData] = useState<PassData>({
     title: "Executive Engineers Conference",
     subtitle: "Annual Tech Summit",
-    description: "Join us for our annual technology conference",
-    logoText: "EE",
-    organizationName: "Executive Engineers",
+    description: "Join us for the tech industry's premier conference",
+    logoText: "EEC",
+    organizationName: "Tech Events Inc.",
     
-    // Colores
-    primaryColor: "#00a8e1",
-    secondaryColor: "#14181B",
-    backgroundColor: "#FFFFFF",
-    foregroundColor: "#000000",
-    labelColor: "#6B7280",
-    logoTextColor: "#FFFFFF",
+    // Colores del pase
+    primaryColor: "#3f51b5",
+    secondaryColor: "#2196f3",
+    backgroundColor: "#e8eaf6",
+    foregroundColor: "#173f5f",
     
-    // Ubicación y fechas
-    location: "San Francisco, CA",
-    date: "2025-06-15",
-    time: "09:00",
+    // Información de evento
+    date: "2023-12-15",
+    time: "10:00",
+    location: "Tech Convention Center",
     
-    // Opciones de configuración
-    barcode: true,
-    barcodeFormat: "qr",
+    // Código de barras
+    barcode: {
+      message: "Executive Engineers Conference",
+      format: "qr",
+      messageEncoding: "iso-8859-1"
+    },
     notifications: true,
     
-    // Imágenes
-    logoImage: "",
-    iconImage: "",
-    stripImage: "",
-    footerImage: "",
-    backgroundImage: "",
-    thumbnailImage: "",
+    // Alineación del texto
+    headerAlignment: "PKTextAlignmentCenter",
+    primaryAlignment: "PKTextAlignmentCenter",
+    secondaryAlignment: "PKTextAlignmentCenter",
+    auxiliaryAlignment: "PKTextAlignmentCenter",
     
-    // Opciones de relevancia
+    // Personalización avanzada
+    allowFullCustomization: false,
+    customization: {
+      enable: false,
+      width: "100%",
+      height: "auto"
+    },
+    
+    // Fechas importantes
     relevantDate: "",
     expirationDate: "",
-    voided: false,
     
-    // Alineación
-    headerAlignment: "natural",
-    primaryAlignment: "natural",
-    secondaryAlignment: "natural",
-    auxiliaryAlignment: "natural",
-    
-    // Estilo de fecha
-    dateStyle: "medium",
-    timeStyle: "short",
-    
-    // Reverso
-    showReverse: false,
-    
-    // Nuevas opciones para personalización avanzada
-    useAdvancedEditor: false,
-    customWidth: 320,
-    customHeight: 480,
-    allowCustomDimensions: true,
-    customPassType: false,
-    allowFullCustomization: false,
+    // Campos específicos por tipo de pase
+    membershipNumber: "",
+    balance: "",
+    discount: "",
+    flightNumber: "",
+    gate: "",
+    seat: "",
+    boardingTime: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+    contactAddress: "",
+    contactWebsite: "",
+    contactJob: "",
+    contactCompany: ""
   })
   
   // Estados para campos personalizados por sección
@@ -284,22 +372,32 @@ export function PassCreator() {
       setIsGenerating(true)
       setGenerationError(null)
       
-      // Preparar los datos del pase
+      // Preparar datos del pase según el tipo seleccionado
       const passDataToSend = {
         ...passData,
-        // Asegurarse de que los campos requeridos estén presentes
-        barcodeMessage: passData.title,
-        barcodeFormat: 'PKBarcodeFormatQR',
-        // Agregar campos personalizados si es necesario
-        customFields: [
-          {
-            key: 'description',
-            label: 'DESCRIPTION',
-            value: passData.description,
-            textAlignment: 'left'
-          }
-        ]
+        barcodeMessage: passData.barcode.message || "Sample Pass",
+        barcodeFormat: passData.barcode.format || "qr"
+      };
+
+      // Incluir imágenes codificadas en base64 si existen
+      if (passData.logoImage) passDataToSend.logoImage = passData.logoImage;
+      if (passData.iconImage) passDataToSend.iconImage = passData.iconImage;
+      if (passData.stripImage) passDataToSend.stripImage = passData.stripImage;
+      if (passData.backgroundImage) passDataToSend.backgroundImage = passData.backgroundImage;
+      if (passData.thumbnailImage) passDataToSend.thumbnailImage = passData.thumbnailImage;
+      if (passData.footerImage) passDataToSend.footerImage = passData.footerImage;
+
+      // Agregar campos personalizados si existen
+      if (backFields.length > 0) {
+        passDataToSend.backFields = backFields.map(field => ({
+          key: field.key,
+          label: field.label,
+          value: field.value,
+          textAlignment: field.textAlignment || "PKTextAlignmentLeft"
+        }));
       }
+
+      console.log("Enviando datos para generar el pase:", { passType, passDataToSend });
       
       // Enviar la solicitud a la API
       const response = await fetch('/api/passes', {
@@ -315,7 +413,7 @@ export function PassCreator() {
       
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to generate pass')
+        throw new Error(errorData.message || 'Failed to generate pass')
       }
       
       // Obtener el blob del pase
@@ -340,6 +438,38 @@ export function PassCreator() {
     }
   }
 
+  // Función para manejar la carga de imágenes
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>, imageType: string) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validar que sea una imagen
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecciona un archivo de imagen válido');
+      return;
+    }
+
+    // Validar tamaño máximo (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('La imagen es demasiado grande. El tamaño máximo es 5MB');
+      return;
+    }
+
+    // Convertir la imagen a base64
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64Image = e.target?.result as string;
+      
+      // Actualizar el estado con la imagen codificada en base64
+      setPassData((prev) => ({
+        ...prev,
+        [imageType]: base64Image
+      }));
+    };
+    
+    reader.readAsDataURL(file);
+  };
+
   return (
     <section className="w-full py-12 md:py-24">
       <div className="container mx-auto max-w-7xl px-4 md:px-6">
@@ -350,8 +480,94 @@ export function PassCreator() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-6">
+            <div className="space-y-6">
+              {/* Selector de tipo de pase prominente */}
+              <Card className="border-2 border-primary/20">
+                <CardContent className="pt-6">
+                  <h3 className="text-lg font-medium mb-4">Tipo de Pase</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${passType === "event" ? "border-primary bg-primary/10" : "border-gray-200 hover:border-primary/50"}`}
+                      onClick={() => setPassType("event")}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold">Boleto de Evento</h4>
+                        {passType === "event" && <div className="w-3 h-3 rounded-full bg-primary"></div>}
+                      </div>
+                      <p className="text-xs text-gray-500">Perfecto para conciertos, conferencias y eventos deportivos.</p>
+                    </div>
+                    
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${passType === "loyalty" ? "border-primary bg-primary/10" : "border-gray-200 hover:border-primary/50"}`}
+                      onClick={() => setPassType("loyalty")}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold">Tarjeta de Fidelidad</h4>
+                        {passType === "loyalty" && <div className="w-3 h-3 rounded-full bg-primary"></div>}
+                      </div>
+                      <p className="text-xs text-gray-500">Ideal para programas de puntos y recompensas.</p>
+                    </div>
+                    
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${passType === "coupon" ? "border-primary bg-primary/10" : "border-gray-200 hover:border-primary/50"}`}
+                      onClick={() => setPassType("coupon")}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold">Cupón</h4>
+                        {passType === "coupon" && <div className="w-3 h-3 rounded-full bg-primary"></div>}
+                      </div>
+                      <p className="text-xs text-gray-500">Para descuentos, ofertas y promociones.</p>
+                    </div>
+                    
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${passType === "boarding" ? "border-primary bg-primary/10" : "border-gray-200 hover:border-primary/50"}`}
+                      onClick={() => setPassType("boarding")}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold">Pase de Embarque</h4>
+                        {passType === "boarding" && <div className="w-3 h-3 rounded-full bg-primary"></div>}
+                      </div>
+                      <p className="text-xs text-gray-500">Para aerolíneas, trenes y otros medios de transporte.</p>
+                    </div>
+                    
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${passType === "storeCard" ? "border-primary bg-primary/10" : "border-gray-200 hover:border-primary/50"}`}
+                      onClick={() => setPassType("storeCard")}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold">Tarjeta de Tienda</h4>
+                        {passType === "storeCard" && <div className="w-3 h-3 rounded-full bg-primary"></div>}
+                      </div>
+                      <p className="text-xs text-gray-500">Para tarjetas de regalo, saldo y membresías.</p>
+                    </div>
+                    
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${passType === "contact" ? "border-primary bg-primary/10" : "border-gray-200 hover:border-primary/50"}`}
+                      onClick={() => setPassType("contact")}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold">Tarjeta de Contacto</h4>
+                        {passType === "contact" && <div className="w-3 h-3 rounded-full bg-primary"></div>}
+                      </div>
+                      <p className="text-xs text-gray-500">Comparte tu información de contacto rápidamente.</p>
+                    </div>
+                    
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${passType === "generic" ? "border-primary bg-primary/10" : "border-gray-200 hover:border-primary/50"}`}
+                      onClick={() => setPassType("generic")}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold">Genérico</h4>
+                        {passType === "generic" && <div className="w-3 h-3 rounded-full bg-primary"></div>}
+                      </div>
+                      <p className="text-xs text-gray-500">Formato personalizable para cualquier uso.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
             <Tabs defaultValue="design" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="design">Diseño</TabsTrigger>
@@ -364,23 +580,7 @@ export function PassCreator() {
               <TabsContent value="design" className="space-y-4 mt-4">
                 <Card>
                   <CardContent className="pt-6 space-y-4">
-                    {/* Tipo de pase */}
-                    <div className="space-y-2">
-                      <Label htmlFor="passType">Tipo de Pase</Label>
-                      <Select value={passType} onValueChange={(value: PassType) => setPassType(value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar tipo de pase" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="event">Boleto de Evento</SelectItem>
-                          <SelectItem value="boarding">Pase de Embarque</SelectItem>
-                          <SelectItem value="coupon">Cupón</SelectItem>
-                          <SelectItem value="storeCard">Tarjeta de Tienda</SelectItem>
-                          <SelectItem value="generic">Genérico</SelectItem>
-                          <SelectItem value="loyalty">Tarjeta de Fidelidad</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                      {/* Tipo de pase - ELIMINADO DE AQUÍ Y MOVIDO ARRIBA */}
                     
                     {/* Colores */}
                     <div className="border rounded-md p-4 space-y-4">
@@ -453,10 +653,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
+                                {passData.logoImage ? (
+                                  <div className="w-16 h-16 mb-2 rounded-lg overflow-hidden">
+                                    <img 
+                                      src={passData.logoImage} 
+                                      alt="Logo Preview" 
+                                      className="w-full h-full object-cover" 
+                                    />
+                                  </div>
+                                ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
+                                )}
                               <p className="text-xs text-gray-500 dark:text-gray-400">Logo principal</p>
                             </div>
-                            <input id="logoUpload" type="file" className="hidden" />
+                              <input 
+                                id="logoUpload" 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(e, 'logoImage')}
+                              />
                           </label>
                         </div>
                       </div>
@@ -469,10 +685,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
+                                {passData.iconImage ? (
+                                  <div className="w-16 h-16 mb-2 rounded-lg overflow-hidden">
+                                    <img 
+                                      src={passData.iconImage} 
+                                      alt="Icon Preview" 
+                                      className="w-full h-full object-cover" 
+                                    />
+                                  </div>
+                                ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
+                                )}
                               <p className="text-xs text-gray-500 dark:text-gray-400">Icono para notificaciones</p>
                             </div>
-                            <input id="iconUpload" type="file" className="hidden" />
+                              <input 
+                                id="iconUpload" 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(e, 'iconImage')}
+                              />
                           </label>
                         </div>
                       </div>
@@ -485,10 +717,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
+                                {passData.stripImage ? (
+                                  <div className="w-20 h-10 mb-2 rounded-lg overflow-hidden">
+                                    <img 
+                                      src={passData.stripImage} 
+                                      alt="Strip Preview" 
+                                      className="w-full h-full object-cover" 
+                                    />
+                                  </div>
+                                ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
-                              <p className="text-xs text-gray-500 dark:text-gray-400">Strip Image</p>
+                                )}
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Imagen de la parte superior</p>
                             </div>
-                            <input id="stripUpload" type="file" className="hidden" />
+                              <input 
+                                id="stripUpload" 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(e, 'stripImage')}
+                              />
                           </label>
                         </div>
                       </div>
@@ -501,10 +749,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
+                                {passData.backgroundImage ? (
+                                  <div className="w-16 h-20 mb-2 rounded-lg overflow-hidden">
+                                    <img 
+                                      src={passData.backgroundImage} 
+                                      alt="Background Preview" 
+                                      className="w-full h-full object-cover" 
+                                    />
+                                  </div>
+                                ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
-                              <p className="text-xs text-gray-500 dark:text-gray-400">Imagen de fondo completa</p>
+                                )}
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Imagen de fondo</p>
                             </div>
-                            <input id="backgroundUpload" type="file" className="hidden" />
+                              <input 
+                                id="backgroundUpload" 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(e, 'backgroundImage')}
+                              />
                           </label>
                         </div>
                       </div>
@@ -517,10 +781,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
+                                {passData.thumbnailImage ? (
+                                  <div className="w-16 h-16 mb-2 rounded-lg overflow-hidden">
+                                    <img 
+                                      src={passData.thumbnailImage} 
+                                      alt="Thumbnail Preview" 
+                                      className="w-full h-full object-cover" 
+                                    />
+                                  </div>
+                                ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
-                              <p className="text-xs text-gray-500 dark:text-gray-400">Miniatura destacada</p>
+                                )}
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Miniatura central</p>
                             </div>
-                            <input id="thumbnailUpload" type="file" className="hidden" />
+                              <input 
+                                id="thumbnailUpload" 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(e, 'thumbnailImage')}
+                              />
                           </label>
                         </div>
                       </div>
@@ -533,10 +813,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
+                                {passData.footerImage ? (
+                                  <div className="w-24 h-8 mb-2 rounded-lg overflow-hidden">
+                                    <img 
+                                      src={passData.footerImage} 
+                                      alt="Footer Preview" 
+                                      className="w-full h-full object-cover" 
+                                    />
+                                  </div>
+                                ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
-                              <p className="text-xs text-gray-500 dark:text-gray-400">Imagen en el pie del pase</p>
+                                )}
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Imagen de pie de página</p>
                             </div>
-                            <input id="footerUpload" type="file" className="hidden" />
+                              <input 
+                                id="footerUpload" 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(e, 'footerImage')}
+                              />
                           </label>
                         </div>
                       </div>
@@ -553,12 +849,16 @@ export function PassCreator() {
                         </div>
                         <Switch
                           id="barcode"
-                          checked={passData.barcode}
-                          onCheckedChange={(checked) => handleChange("barcode", checked)}
+                            checked={passData.barcode.message !== ""}
+                            onCheckedChange={(checked) => {
+                              handleChange("barcode.message", checked ? "Executive Engineers Conference" : "");
+                              handleChange("barcode.format", checked ? "qr" : "");
+                              handleChange("barcode.messageEncoding", checked ? "iso-8859-1" : "");
+                            }}
                         />
                       </div>
                       
-                      {passData.barcode && (
+                        {passData.barcode.message && (
                         <div className="space-y-2">
                           <Label>Formato del Código</Label>
                           <div className="space-y-2">
@@ -567,8 +867,8 @@ export function PassCreator() {
                                 type="radio" 
                                 id="qr" 
                                 value="qr" 
-                                checked={passData.barcodeFormat === "qr"}
-                                onChange={() => handleChange("barcodeFormat", "qr")}
+                                  checked={passData.barcode.format === "qr"}
+                                  onChange={() => handleChange("barcode.format", "qr")}
                               />
                               <Label htmlFor="qr">QR Code</Label>
                             </div>
@@ -577,8 +877,8 @@ export function PassCreator() {
                                 type="radio" 
                                 id="pdf417" 
                                 value="pdf417" 
-                                checked={passData.barcodeFormat === "pdf417"}
-                                onChange={() => handleChange("barcodeFormat", "pdf417")}
+                                  checked={passData.barcode.format === "pdf417"}
+                                  onChange={() => handleChange("barcode.format", "pdf417")}
                               />
                               <Label htmlFor="pdf417">PDF417</Label>
                             </div>
@@ -587,8 +887,8 @@ export function PassCreator() {
                                 type="radio" 
                                 id="aztec" 
                                 value="aztec" 
-                                checked={passData.barcodeFormat === "aztec"}
-                                onChange={() => handleChange("barcodeFormat", "aztec")}
+                                  checked={passData.barcode.format === "aztec"}
+                                  onChange={() => handleChange("barcode.format", "aztec")}
                               />
                               <Label htmlFor="aztec">Aztec</Label>
                             </div>
@@ -597,8 +897,8 @@ export function PassCreator() {
                                 type="radio" 
                                 id="code128" 
                                 value="code128" 
-                                checked={passData.barcodeFormat === "code128"}
-                                onChange={() => handleChange("barcodeFormat", "code128")}
+                                  checked={passData.barcode.format === "code128"}
+                                  onChange={() => handleChange("barcode.format", "code128")}
                               />
                               <Label htmlFor="code128">Code 128</Label>
                             </div>
@@ -652,6 +952,17 @@ export function PassCreator() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="logoText">Texto del Logo</Label>
+                          <Input
+                            id="logoText"
+                            value={passData.logoText}
+                            onChange={(e) => handleChange("logoText", e.target.value)}
+                            maxLength={4}
+                          />
+                        </div>
+                        
+                        {(passType === "event" || passType === "generic" || passType === "coupon") && (
                       <div className="space-y-2">
                         <Label htmlFor="location">Ubicación</Label>
                         <Input
@@ -660,17 +971,238 @@ export function PassCreator() {
                           onChange={(e) => handleChange("location", e.target.value)}
                         />
                       </div>
+                        )}
+                      </div>
+
+                      {/* Campos específicos según el tipo de pase */}
+                      {passType === "event" && (
+                        <div className="border rounded-md p-4 space-y-4">
+                          <h3 className="text-base font-medium">Detalles del Evento</h3>
+                          <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="logoText">Texto del Logo</Label>
+                              <Label htmlFor="date">Fecha</Label>
                         <Input
-                          id="logoText"
-                          value={passData.logoText}
-                          onChange={(e) => handleChange("logoText", e.target.value)}
-                          maxLength={4}
+                                id="date"
+                                type="date"
+                                value={passData.date}
+                                onChange={(e) => handleChange("date", e.target.value)}
                         />
                       </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="time">Hora</Label>
+                              <Input
+                                id="time"
+                                type="time"
+                                value={passData.time}
+                                onChange={(e) => handleChange("time", e.target.value)}
+                              />
                     </div>
+                          </div>
+                        </div>
+                      )}
 
+                      {passType === "loyalty" && (
+                        <div className="border rounded-md p-4 space-y-4">
+                          <h3 className="text-base font-medium">Detalles de Fidelidad</h3>
+                          <div className="space-y-2">
+                            <Label htmlFor="membershipNumber">Número de Socio</Label>
+                            <Input
+                              id="membershipNumber"
+                              value={passData.membershipNumber}
+                              onChange={(e) => handleChange("membershipNumber", e.target.value)}
+                              placeholder="1234567890"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="balance">Saldo de Puntos</Label>
+                            <Input
+                              id="balance"
+                              value={passData.balance}
+                              onChange={(e) => handleChange("balance", e.target.value)}
+                              placeholder="150 puntos"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {passType === "coupon" && (
+                        <div className="border rounded-md p-4 space-y-4">
+                          <h3 className="text-base font-medium">Detalles del Cupón</h3>
+                          <div className="space-y-2">
+                            <Label htmlFor="discount">Descuento</Label>
+                            <Input
+                              id="discount"
+                              value={passData.discount}
+                              onChange={(e) => handleChange("discount", e.target.value)}
+                              placeholder="20% DESCUENTO"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="expirationDate">Fecha de Expiración</Label>
+                            <Input
+                              id="expirationDate"
+                              type="datetime-local"
+                              value={passData.expirationDate}
+                              onChange={(e) => handleChange("expirationDate", e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {passType === "boarding" && (
+                        <div className="border rounded-md p-4 space-y-4">
+                          <h3 className="text-base font-medium">Detalles de Embarque</h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="flightNumber">Número de Vuelo</Label>
+                              <Input
+                                id="flightNumber"
+                                value={passData.flightNumber}
+                                onChange={(e) => handleChange("flightNumber", e.target.value)}
+                                placeholder="AB123"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="gate">Puerta</Label>
+                              <Input
+                                id="gate"
+                                value={passData.gate}
+                                onChange={(e) => handleChange("gate", e.target.value)}
+                                placeholder="B12"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="seat">Asiento</Label>
+                              <Input
+                                id="seat"
+                                value={passData.seat}
+                                onChange={(e) => handleChange("seat", e.target.value)}
+                                placeholder="23A"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="boardingTime">Hora de Embarque</Label>
+                              <Input
+                                id="boardingTime"
+                                value={passData.boardingTime}
+                                onChange={(e) => handleChange("boardingTime", e.target.value)}
+                                placeholder="11:30"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="date">Fecha de Vuelo</Label>
+                            <Input
+                              id="date"
+                              type="date"
+                              value={passData.date}
+                              onChange={(e) => handleChange("date", e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {passType === "storeCard" && (
+                        <div className="border rounded-md p-4 space-y-4">
+                          <h3 className="text-base font-medium">Detalles de Tarjeta</h3>
+                          <div className="space-y-2">
+                            <Label htmlFor="membershipNumber">Número de Tarjeta</Label>
+                            <Input
+                              id="membershipNumber"
+                              value={passData.membershipNumber}
+                              onChange={(e) => handleChange("membershipNumber", e.target.value)}
+                              placeholder="1234-5678-9012"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="balance">Saldo</Label>
+                            <Input
+                              id="balance"
+                              value={passData.balance}
+                              onChange={(e) => handleChange("balance", e.target.value)}
+                              placeholder="50,00 €"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {passType === "contact" && (
+                        <div className="border rounded-md p-4 space-y-4">
+                          <h3 className="text-base font-medium">Información de Contacto</h3>
+                          <div className="space-y-2">
+                            <Label htmlFor="contactName">Nombre Completo</Label>
+                            <Input
+                              id="contactName"
+                              value={passData.contactName}
+                              onChange={(e) => handleChange("contactName", e.target.value)}
+                              placeholder="Juan Pérez"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="contactJob">Cargo</Label>
+                            <Input
+                              id="contactJob"
+                              value={passData.contactJob}
+                              onChange={(e) => handleChange("contactJob", e.target.value)}
+                              placeholder="Director de Marketing"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="contactCompany">Empresa</Label>
+                            <Input
+                              id="contactCompany"
+                              value={passData.contactCompany}
+                              onChange={(e) => handleChange("contactCompany", e.target.value)}
+                              placeholder="Empresa S.A."
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="contactPhone">Teléfono</Label>
+                              <Input
+                                id="contactPhone"
+                                value={passData.contactPhone}
+                                onChange={(e) => handleChange("contactPhone", e.target.value)}
+                                placeholder="+34 600 000 000"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="contactEmail">Email</Label>
+                              <Input
+                                id="contactEmail"
+                                value={passData.contactEmail}
+                                onChange={(e) => handleChange("contactEmail", e.target.value)}
+                                placeholder="ejemplo@email.com"
+                                type="email"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="contactWebsite">Sitio Web</Label>
+                            <Input
+                              id="contactWebsite"
+                              value={passData.contactWebsite}
+                              onChange={(e) => handleChange("contactWebsite", e.target.value)}
+                              placeholder="https://www.ejemplo.com"
+                              type="url"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="contactAddress">Dirección</Label>
+                            <Textarea
+                              id="contactAddress"
+                              value={passData.contactAddress}
+                              onChange={(e) => handleChange("contactAddress", e.target.value)}
+                              placeholder="Calle Ejemplo 123, 28001 Madrid, España"
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {passType === "generic" && (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="date">Fecha</Label>
@@ -689,6 +1221,32 @@ export function PassCreator() {
                           value={passData.time}
                           onChange={(e) => handleChange("time", e.target.value)}
                         />
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="border rounded-md p-4 space-y-4">
+                        <h3 className="text-base font-medium">Fechas Importantes</h3>
+                        <div className="space-y-2">
+                          <Label htmlFor="relevantDate">Fecha Relevante</Label>
+                          <Input
+                            id="relevantDate"
+                            type="datetime-local"
+                            value={passData.relevantDate}
+                            onChange={(e) => handleChange("relevantDate", e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">Cuándo el pase será relevante para mostrar</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="expirationDate">Fecha de Expiración</Label>
+                          <Input
+                            id="expirationDate"
+                            type="datetime-local"
+                            value={passData.expirationDate}
+                            onChange={(e) => handleChange("expirationDate", e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">Cuándo el pase expirará</p>
                       </div>
                     </div>
                   </CardContent>
@@ -831,7 +1389,13 @@ export function PassCreator() {
                       <Switch
                         id="useAdvancedEditor"
                         checked={passData.useAdvancedEditor}
-                        onCheckedChange={(checked) => handleChange("useAdvancedEditor", checked)}
+                          onCheckedChange={(checked) => {
+                            handleChange("useAdvancedEditor", checked);
+                            // Si desactivamos el editor avanzado, también desactivamos personalización completa
+                            if (!checked) {
+                              handleChange("allowFullCustomization", false);
+                            }
+                          }}
                       />
                     </div>
                     
@@ -897,7 +1461,13 @@ export function PassCreator() {
                       <Switch
                         id="allowFullCustomization"
                         checked={passData.allowFullCustomization}
-                        onCheckedChange={(checked) => handleChange("allowFullCustomization", checked)}
+                          onCheckedChange={(checked) => {
+                            // Si se activa la personalización completa, también activar el editor avanzado
+                            if (checked) {
+                              handleChange("useAdvancedEditor", true);
+                            }
+                            handleChange("allowFullCustomization", checked);
+                          }}
                       />
                     </div>
                   </CardContent>
@@ -968,617 +1538,50 @@ export function PassCreator() {
                   <p className="text-sm font-medium">Error: {generationError}</p>
                 </div>
               )}
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-center">
-            <h3 className="text-xl font-semibold mb-6">Vista Previa del Pase</h3>
+          <div className="hidden md:block">
+            <div className="sticky top-24 w-full">
+              <h3 className="text-xl font-semibold mb-6 text-center">Vista Previa del Pase</h3>
             {passData.useAdvancedEditor ? (
               <div className="space-y-4 w-full">
-                <div className="flex flex-wrap gap-2 justify-center mb-4">
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => {
-                      const newElement: PositionableElement = {
-                        id: `text_${Date.now()}`,
-                        type: "text",
-                        content: "Texto editable",
-                        x: Math.floor(passData.customWidth / 2) - 50,
-                        y: Math.floor(passData.customHeight / 2) - 10,
-                        width: 100,
-                        height: 20,
-                        rotation: 0,
-                        zIndex: freeElements.length + 1,
-                        styles: {
-                          fontFamily: "Helvetica",
-                          fontSize: 16,
-                          fontWeight: "normal",
-                          color: "#000000",
-                          backgroundColor: "transparent",
-                          borderRadius: 0,
-                          borderWidth: 0,
-                          borderColor: "#000000",
-                          opacity: 1
-                        }
-                      };
-                      setFreeElements([...freeElements, newElement]);
-                      setSelectedElement(newElement.id);
-                    }}
-                  >
-                    Añadir Texto
-                  </Button>
-                  
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => {
-                      const newElement: PositionableElement = {
-                        id: `image_${Date.now()}`,
-                        type: "image",
-                        content: "",
-                        x: Math.floor(passData.customWidth / 2) - 50,
-                        y: Math.floor(passData.customHeight / 2) - 50,
-                        width: 100,
-                        height: 100,
-                        rotation: 0,
-                        zIndex: freeElements.length + 1,
-                        styles: {
-                          opacity: 1,
-                          borderRadius: 0,
-                          borderWidth: 0,
-                          borderColor: "#000000",
-                          backgroundColor: "transparent"
-                        }
-                      };
-                      setFreeElements([...freeElements, newElement]);
-                      setSelectedElement(newElement.id);
-                    }}
-                  >
-                    Añadir Imagen
-                  </Button>
-                  
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => {
-                      const newElement: PositionableElement = {
-                        id: `barcode_${Date.now()}`,
-                        type: "barcode",
-                        content: "https://example.com",
-                        x: Math.floor(passData.customWidth / 2) - 60,
-                        y: Math.floor(passData.customHeight / 2) - 60,
-                        width: 120,
-                        height: 120,
-                        rotation: 0,
-                        zIndex: freeElements.length + 1,
-                        styles: {
-                          opacity: 1,
-                          borderRadius: 0,
-                          borderWidth: 0,
-                          borderColor: "#000000",
-                          backgroundColor: "transparent"
-                        }
-                      };
-                      setFreeElements([...freeElements, newElement]);
-                      setSelectedElement(newElement.id);
-                    }}
-                  >
-                    Añadir Código
-                  </Button>
-                  
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => {
-                      const newElement: PositionableElement = {
-                        id: `shape_${Date.now()}`,
-                        type: "shape",
-                        content: "",
-                        x: Math.floor(passData.customWidth / 2) - 40,
-                        y: Math.floor(passData.customHeight / 2) - 40,
-                        width: 80,
-                        height: 80,
-                        rotation: 0,
-                        zIndex: freeElements.length + 1,
-                        styles: {
-                          backgroundColor: "#CCCCCC",
-                          borderRadius: 8,
-                          borderWidth: 0,
-                          borderColor: "#000000",
-                          opacity: 0.8
-                        }
-                      };
-                      setFreeElements([...freeElements, newElement]);
-                      setSelectedElement(newElement.id);
-                    }}
-                  >
-                    Añadir Forma
-                  </Button>
-                </div>
-                
-                {selectedElement && (
-                  <Card className="w-full mb-4">
-                    <CardContent className="pt-4 pb-2">
-                      <h4 className="text-sm font-medium mb-3">Editar Elemento</h4>
-                      {freeElements.find(el => el.id === selectedElement)?.type === "text" && (
-                        <div className="space-y-3">
-                          <div className="space-y-2">
-                            <Label>Texto</Label>
-                            <Textarea 
-                              value={freeElements.find(el => el.id === selectedElement)?.content || ""}
-                              onChange={(e) => {
-                                setFreeElements(
-                                  freeElements.map(el => 
-                                    el.id === selectedElement 
-                                      ? { ...el, content: e.target.value }
-                                      : el
-                                  )
-                                );
-                              }}
-                              rows={2}
+                  <AdvancedPassEditor 
+                    backgroundColor={passData.backgroundColor}
+                    width={passData.customWidth} 
+                    height={passData.customHeight} 
+                    elements={freeElements} 
+                    setElements={setFreeElements}
+                    selectedElement={selectedElement} 
+                    setSelectedElement={setSelectedElement} 
                             />
                           </div>
-                          
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                              <Label>Fuente</Label>
-                              <Select 
-                                value={freeElements.find(el => el.id === selectedElement)?.styles.fontFamily || "Helvetica"}
-                                onValueChange={(value) => {
-                                  setFreeElements(
-                                    freeElements.map(el => 
-                                      el.id === selectedElement 
-                                        ? { 
-                                            ...el, 
-                                            styles: { 
-                                              ...el.styles, 
-                                              fontFamily: value 
-                                            } 
-                                          }
-                                        : el
-                                    )
-                                  );
-                                }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Seleccionar fuente" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Helvetica">Helvetica</SelectItem>
-                                  <SelectItem value="Arial">Arial</SelectItem>
-                                  <SelectItem value="Times New Roman">Times New Roman</SelectItem>
-                                  <SelectItem value="Courier">Courier</SelectItem>
-                                  <SelectItem value="SF Pro">SF Pro</SelectItem>
-                                  <SelectItem value="Georgia">Georgia</SelectItem>
-                                </SelectContent>
-                              </Select>
+              ) : (
+                <PassPreview passType={passType} passData={passData} />
+              )}
                             </div>
-                            
-                            <div className="space-y-2">
-                              <Label>Tamaño</Label>
-                              <Input 
-                                type="number" 
-                                value={freeElements.find(el => el.id === selectedElement)?.styles.fontSize || 16} 
-                                onChange={(e) => {
-                                  setFreeElements(
-                                    freeElements.map(el => 
-                                      el.id === selectedElement 
-                                        ? { 
-                                            ...el, 
-                                            styles: { 
-                                              ...el.styles, 
-                                              fontSize: Number(e.target.value) 
-                                            } 
-                                          }
-                                        : el
-                                    )
-                                  );
-                                }}
-                                min={8}
-                                max={72}
-                              />
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                              <Label>Color de texto</Label>
-                              <ColorPicker
-                                color={freeElements.find(el => el.id === selectedElement)?.styles.color || "#000000"}
-                                onChange={(color) => {
-                                  setFreeElements(
-                                    freeElements.map(el => 
-                                      el.id === selectedElement 
-                                        ? { 
-                                            ...el, 
-                                            styles: { 
-                                              ...el.styles, 
-                                              color 
-                                            } 
-                                          }
-                                        : el
-                                    )
-                                  );
-                                }}
-                              />
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label>Fondo</Label>
-                              <ColorPicker
-                                color={freeElements.find(el => el.id === selectedElement)?.styles.backgroundColor || "transparent"}
-                                onChange={(color) => {
-                                  setFreeElements(
-                                    freeElements.map(el => 
-                                      el.id === selectedElement 
-                                        ? { 
-                                            ...el, 
-                                            styles: { 
-                                              ...el.styles, 
-                                              backgroundColor: color 
-                                            } 
-                                          }
-                                        : el
-                                    )
-                                  );
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {freeElements.find(el => el.id === selectedElement)?.type === "shape" && (
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                              <Label>Color de fondo</Label>
-                              <ColorPicker
-                                color={freeElements.find(el => el.id === selectedElement)?.styles.backgroundColor || "#CCCCCC"}
-                                onChange={(color) => {
-                                  setFreeElements(
-                                    freeElements.map(el => 
-                                      el.id === selectedElement 
-                                        ? { 
-                                            ...el, 
-                                            styles: { 
-                                              ...el.styles, 
-                                              backgroundColor: color 
-                                            } 
-                                          }
-                                        : el
-                                    )
-                                  );
-                                }}
-                              />
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label>Borde redondeado</Label>
-                              <Input 
-                                type="number" 
-                                value={freeElements.find(el => el.id === selectedElement)?.styles.borderRadius || 0} 
-                                onChange={(e) => {
-                                  setFreeElements(
-                                    freeElements.map(el => 
-                                      el.id === selectedElement 
-                                        ? { 
-                                            ...el, 
-                                            styles: { 
-                                              ...el.styles, 
-                                              borderRadius: Number(e.target.value) 
-                                            } 
-                                          }
-                                        : el
-                                    )
-                                  );
-                                }}
-                                min={0}
-                                max={100}
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                              <Label>Opacidad</Label>
-                              <Input 
-                                type="range" 
-                                value={freeElements.find(el => el.id === selectedElement)?.styles.opacity || 1} 
-                                onChange={(e) => {
-                                  setFreeElements(
-                                    freeElements.map(el => 
-                                      el.id === selectedElement 
-                                        ? { 
-                                            ...el, 
-                                            styles: { 
-                                              ...el.styles, 
-                                              opacity: Number(e.target.value) 
-                                            } 
-                                          }
-                                        : el
-                                    )
-                                  );
-                                }}
-                                min={0}
-                                max={1}
-                                step={0.05}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {freeElements.find(el => el.id === selectedElement)?.type === "barcode" && (
-                        <div className="space-y-3">
-                          <div className="space-y-2">
-                            <Label>Contenido del código</Label>
-                            <Textarea 
-                              value={freeElements.find(el => el.id === selectedElement)?.content || ""}
-                              onChange={(e) => {
-                                setFreeElements(
-                                  freeElements.map(el => 
-                                    el.id === selectedElement 
-                                      ? { ...el, content: e.target.value }
-                                      : el
-                                  )
-                                );
-                              }}
-                              rows={2}
-                              placeholder="URL o texto para el código"
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label>Tipo de código</Label>
-                            <Select 
-                              defaultValue="qr"
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar tipo" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="qr">QR Code</SelectItem>
-                                <SelectItem value="pdf417">PDF417</SelectItem>
-                                <SelectItem value="aztec">Aztec</SelectItem>
-                                <SelectItem value="code128">Code 128</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {freeElements.find(el => el.id === selectedElement)?.type === "image" && (
-                        <div className="space-y-3">
-                          <div className="space-y-2">
-                            <Label>URL de la imagen</Label>
-                            <Input 
-                              placeholder="https://ejemplo.com/imagen.jpg" 
-                              value={freeElements.find(el => el.id === selectedElement)?.content || ""}
-                              onChange={(e) => {
-                                setFreeElements(
-                                  freeElements.map(el => 
-                                    el.id === selectedElement 
-                                      ? { ...el, content: e.target.value }
-                                      : el
-                                  )
-                                );
-                              }}
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label>Subir imagen</Label>
-                            <Button variant="outline" className="w-full">
-                              <Upload className="mr-2 h-4 w-4" />
-                              Seleccionar archivo
-                            </Button>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                              <Label>Borde redondeado</Label>
-                              <Input 
-                                type="number" 
-                                value={freeElements.find(el => el.id === selectedElement)?.styles.borderRadius || 0} 
-                                onChange={(e) => {
-                                  setFreeElements(
-                                    freeElements.map(el => 
-                                      el.id === selectedElement 
-                                        ? { 
-                                            ...el, 
-                                            styles: { 
-                                              ...el.styles, 
-                                              borderRadius: Number(e.target.value) 
-                                            } 
-                                          }
-                                        : el
-                                    )
-                                  );
-                                }}
-                                min={0}
-                                max={100}
-                              />
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label>Opacidad</Label>
-                              <Input 
-                                type="range" 
-                                value={freeElements.find(el => el.id === selectedElement)?.styles.opacity || 1} 
-                                onChange={(e) => {
-                                  setFreeElements(
-                                    freeElements.map(el => 
-                                      el.id === selectedElement 
-                                        ? { 
-                                            ...el, 
-                                            styles: { 
-                                              ...el.styles, 
-                                              opacity: Number(e.target.value) 
-                                            } 
-                                          }
-                                        : el
-                                    )
-                                  );
-                                }}
-                                min={0}
-                                max={1}
-                                step={0.05}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="mt-4 flex justify-between items-center">
-                        <Button 
-                          variant="destructive" 
-                          size="sm"
-                          onClick={() => {
-                            setFreeElements(freeElements.filter(el => el.id !== selectedElement));
-                            setSelectedElement(null);
-                          }}
-                        >
-                          <Trash2 className="mr-1 h-4 w-4" />
-                          Eliminar
-                        </Button>
-                        
-                        <div className="flex space-x-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => {
-                              setFreeElements(
-                                freeElements.map(el => {
-                                  if (el.id === selectedElement) {
-                                    return {
-                                      ...el,
-                                      zIndex: Math.max(1, el.zIndex - 1)
-                                    };
-                                  }
-                                  return el;
-                                })
-                              );
-                            }}
-                          >
-                            <ArrowDown className="h-4 w-4" />
-                          </Button>
-                          
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => {
-                              setFreeElements(
-                                freeElements.map(el => {
-                                  if (el.id === selectedElement) {
-                                    return {
-                                      ...el,
-                                      zIndex: el.zIndex + 1
-                                    };
-                                  }
-                                  return el;
-                                })
-                              );
-                            }}
-                          >
-                            <ArrowUp className="h-4 w-4" />
-                          </Button>
-                          
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => {
-                              setSelectedElement(null);
-                            }}
-                          >
-                            Listo
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                
-                <div 
-                  className="border rounded-md overflow-hidden shadow-md relative mx-auto"
-                  style={{ 
-                    width: `${passData.customWidth}px`, 
-                    height: `${passData.customHeight}px`,
-                    backgroundColor: passData.backgroundColor,
-                    maxWidth: '100%',
-                    maxHeight: '600px'
-                  }}
-                >
-                  {freeElements.map((element) => (
-                    <div
-                      key={element.id}
-                      className={`absolute ${selectedElement === element.id ? 'ring-2 ring-blue-500' : ''}`}
-                      style={{
-                        left: `${element.x}px`,
-                        top: `${element.y}px`,
-                        width: `${element.width}px`,
-                        height: `${element.height}px`,
-                        transform: `rotate(${element.rotation}deg)`,
-                        zIndex: element.zIndex,
-                        backgroundColor: element.styles.backgroundColor,
-                        borderRadius: `${element.styles.borderRadius}px`,
-                        border: element.styles.borderWidth 
-                          ? `${element.styles.borderWidth}px solid ${element.styles.borderColor}` 
-                          : 'none',
-                        opacity: element.styles.opacity,
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => setSelectedElement(element.id)}
-                    >
-                      {element.type === 'text' && (
-                        <p
-                          style={{
-                            fontFamily: element.styles.fontFamily,
-                            fontSize: `${element.styles.fontSize}px`,
-                            fontWeight: element.styles.fontWeight,
-                            color: element.styles.color,
-                            margin: 0,
-                            padding: '4px',
-                            width: '100%',
-                            height: '100%',
-                            overflow: 'hidden'
-                          }}
-                        >
-                          {element.content}
-                        </p>
-                      )}
-                      {element.type === 'image' && (
-                        <div className="w-full h-full">
-                          {element.content ? (
-                            <img 
-                              src={element.content} 
-                              alt="Custom element" 
-                              className="max-w-full max-h-full object-contain" 
-                            />
-                          ) : (
-                            <div className="h-full w-full bg-gray-100 flex items-center justify-center">
-                              <Image className="h-6 w-6 text-gray-400" />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {element.type === 'barcode' && (
-                        <div className="w-full h-full bg-gray-900 flex items-center justify-center">
-                          <QrCode className="h-6 w-6 text-white" />
-                        </div>
-                      )}
-                      {element.type === 'shape' && (
-                        <div className="w-full h-full" />
-                      )}
-                    </div>
-                  ))}
-                </div>
+        {/* Vista previa móvil - solo visible en pantallas pequeñas */}
+        <div className="mt-8 md:hidden">
+          <h3 className="text-xl font-semibold mb-6 text-center">Vista Previa del Pase</h3>
+          {passData.useAdvancedEditor ? (
+            <div className="space-y-4 w-full">
+              <AdvancedPassEditor 
+                backgroundColor={passData.backgroundColor}
+                width={passData.customWidth} 
+                height={passData.customHeight} 
+                elements={freeElements} 
+                setElements={setFreeElements}
+                selectedElement={selectedElement} 
+                setSelectedElement={setSelectedElement} 
+              />
               </div>
             ) : (
               <PassPreview passType={passType} passData={passData} />
             )}
-          </div>
         </div>
       </div>
     </section>

@@ -69,6 +69,48 @@ export interface PassData {
 // Tipo de pase
 export type PassType = 'eventTicket' | 'boardingPass' | 'coupon' | 'generic' | 'storeCard';
 
+// Interfaz para los campos personalizados procesados
+interface PKField {
+  key: string;
+  label: string;
+  value: string;
+  textAlignment?: string;
+  dateStyle?: string;
+  timeStyle?: string;
+}
+
+// Interfaz para el código de barras
+interface PKBarcode {
+  message: string;
+  format: string;
+  messageEncoding: string;
+}
+
+// Función para convertir el formato de alineación de texto al esperado por Apple Wallet
+function getPKTextAlignment(alignment?: string): string {
+  if (!alignment) return 'PKTextAlignmentNatural';
+  
+  switch (alignment.toLowerCase()) {
+    case 'left': return 'PKTextAlignmentLeft';
+    case 'center': return 'PKTextAlignmentCenter';
+    case 'right': return 'PKTextAlignmentRight';
+    default: return 'PKTextAlignmentNatural';
+  }
+}
+
+// Función para convertir el estilo de fecha/hora al esperado por Apple Wallet
+function getPKDateTimeStyle(style?: string): string | undefined {
+  if (!style || style === 'none') return undefined;
+  
+  switch (style.toLowerCase()) {
+    case 'short': return 'PKDateStyleShort';
+    case 'medium': return 'PKDateStyleMedium';
+    case 'long': return 'PKDateStyleLong';
+    case 'full': return 'PKDateStyleFull';
+    default: return undefined;
+  }
+}
+
 // Función para generar un pase digital
 export async function generatePass(passType: PassType, passData: PassData): Promise<Buffer> {
   try {
@@ -103,8 +145,10 @@ export async function generatePass(passType: PassType, passData: PassData): Prom
     
     console.log("Certificates loaded, creating pass...");
     
-    // IMPORTANTE: Siempre usar generic porque es el que funciona
-    const model = 'generic';
+    // Determinar el tipo de pase efectivo
+    // Si el usuario solicita personalización completa, usamos 'generic'
+    // De lo contrario, usamos el tipo solicitado
+    const effectivePassType = passData.customPassType ? 'generic' : passType;
     
     // Crear una instancia de PKPass
     const pass = new PKPass({}, {
@@ -114,11 +158,11 @@ export async function generatePass(passType: PassType, passData: PassData): Prom
       signerKeyPassphrase: applePassConfig.signerKeyPassphrase
     });
 
-    // Establecer propiedades del pase
-    pass.type = model;
+    // Importante: Establecer el tipo explícitamente
+    pass.type = effectivePassType;
     
-    // Preparar estructura del JSON
-    const basicInfo = {
+    // Preparar la información básica del pase
+    const basicInfo: Record<string, string | number | boolean> = {
       formatVersion: 1,
       passTypeIdentifier: applePassConfig.passTypeIdentifier,
       serialNumber: `pass-${Date.now()}`,
@@ -128,98 +172,122 @@ export async function generatePass(passType: PassType, passData: PassData): Prom
       logoText: passData.logoText || "Logo Text",
     };
     
-    // Añadir colores
-    const colors: Record<string, string> = {};
-    if (passData.foregroundColor) colors.foregroundColor = passData.foregroundColor;
-    if (passData.backgroundColor) colors.backgroundColor = passData.backgroundColor;
-    if (passData.labelColor) colors.labelColor = passData.labelColor;
+    // Aplicar colores
+    if (passData.foregroundColor) basicInfo.foregroundColor = passData.foregroundColor;
+    if (passData.backgroundColor) basicInfo.backgroundColor = passData.backgroundColor;
+    if (passData.labelColor) basicInfo.labelColor = passData.labelColor;
     
-    // Preparar campos principales
-    const genericFields = {
+    // Fechas de relevancia
+    if (passData.relevantDate) basicInfo.relevantDate = passData.relevantDate;
+    if (passData.expirationDate) basicInfo.expirationDate = passData.expirationDate;
+    if (passData.voided !== undefined) basicInfo.voided = passData.voided;
+    
+    // Definir el JSON completo del pase con tipos más específicos
+    type PassJsonType = {
+      [key: string]: string | number | boolean | PKField[] | PKBarcode | PKBarcode[] | Record<string, PKField[]>;
+    };
+    
+    const passJSON: PassJsonType = { ...basicInfo };
+    
+    if (passData.barcode) {
+      // Formato moderno de códigos
+      const barcodeData: PKBarcode = {
+        message: passData.barcodeMessage || `PASS-${Date.now()}`,
+        format: passData.barcodeFormat ? `PKBarcodeFormat${passData.barcodeFormat.charAt(0).toUpperCase() + passData.barcodeFormat.slice(1)}` : "PKBarcodeFormatQR",
+        messageEncoding: "iso-8859-1"
+      };
+      
+      passJSON.barcodes = [barcodeData];
+      
+      // Para compatibilidad con iOS antiguo
+      passJSON.barcode = barcodeData;
+    }
+    
+    // Preparar los campos del pase según su tipo
+    const fieldsData: Record<string, PKField[]> = {
       primaryFields: [
         {
           key: "title",
-          label: "TITLE",
-          value: passData.title
+          label: effectivePassType === 'eventTicket' ? "EVENT" : "TITLE",
+          value: passData.title,
+          textAlignment: getPKTextAlignment(passData.primaryAlignment)
         }
       ],
       secondaryFields: [
         {
           key: "location",
           label: "LOCATION",
-          value: passData.location
+          value: passData.location,
+          textAlignment: getPKTextAlignment(passData.secondaryAlignment)
         }
       ],
-      auxiliaryFields: [
-        {
-          key: "date",
-          label: "DATE",
-          value: passData.date
-        }
-      ],
-      backFields: [] as any[]
+      auxiliaryFields: [],
+      backFields: []
     };
     
     // Añadir subtítulo si existe
     if (passData.subtitle) {
-      genericFields.secondaryFields.push({
+      fieldsData.secondaryFields.push({
         key: "subtitle",
         label: "SUBTITLE",
-        value: passData.subtitle
+        value: passData.subtitle,
+        textAlignment: getPKTextAlignment(passData.secondaryAlignment)
       });
     }
+    
+    // Añadir fecha con el estilo apropiado
+    const dateField: PKField = {
+      key: "date",
+      label: "DATE",
+      value: passData.date,
+      textAlignment: getPKTextAlignment(passData.auxiliaryAlignment)
+    };
+    
+    // Aplicar estilos de fecha/hora si están definidos
+    if (passData.dateStyle) {
+      const dateStyleValue = getPKDateTimeStyle(passData.dateStyle);
+      if (dateStyleValue) dateField.dateStyle = dateStyleValue;
+    }
+    
+    fieldsData.auxiliaryFields.push(dateField);
     
     // Añadir hora si existe
     if (passData.time) {
-      genericFields.auxiliaryFields.push({
+      const timeField: PKField = {
         key: "time",
         label: "TIME",
-        value: passData.time
-      });
+        value: passData.time,
+        textAlignment: getPKTextAlignment(passData.auxiliaryAlignment)
+      };
+      
+      // Aplicar estilo de hora si está definido
+      if (passData.timeStyle) {
+        const timeStyleValue = getPKDateTimeStyle(passData.timeStyle);
+        if (timeStyleValue) timeField.timeStyle = timeStyleValue;
+      }
+      
+      fieldsData.auxiliaryFields.push(timeField);
     }
     
-    // Añadir campos personalizados
+    // Añadir campos personalizados si existen
     if (passData.customFields && passData.customFields.length > 0) {
-      genericFields.backFields = passData.customFields.map(field => ({
+      fieldsData.backFields = passData.customFields.map(field => ({
         key: field.key,
         label: field.label,
-        value: field.value
+        value: field.value,
+        textAlignment: getPKTextAlignment(field.textAlignment)
       }));
     }
     
-    // Preparar información de código de barras
-    const barcodeInfo: Record<string, any> = {};
-    if (passData.barcode) {
-      barcodeInfo.barcodes = [
-        {
-          message: passData.barcodeMessage || `PASS-${Date.now()}`,
-          format: passData.barcodeFormat || "PKBarcodeFormatQR",
-          messageEncoding: "iso-8859-1"
-        }
-      ];
-      
-      // Para compatibilidad con iOS antiguo
-      barcodeInfo.barcode = {
-        message: passData.barcodeMessage || `PASS-${Date.now()}`,
-        format: passData.barcodeFormat || "PKBarcodeFormatQR",
-        messageEncoding: "iso-8859-1"
-      };
-    }
-    
-    // Compilar el JSON completo del pase
-    const passJSON = {
-      ...basicInfo,
-      ...colors,
-      ...barcodeInfo,
-      generic: genericFields
-    };
+    // Añadir los campos según el tipo de pase
+    passJSON[effectivePassType] = fieldsData;
     
     console.log("Pass structure prepared:", JSON.stringify(passJSON, null, 2));
     
     // Añadir el JSON del pase
     pass.addBuffer("pass.json", Buffer.from(JSON.stringify(passJSON)));
     
-    // Agregar imágenes requeridas
+    // Añadir imágenes requeridas
     const simpleIcon = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAB0AAAAdCAYAAABWk2cPAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAABISURBVEhL7c2hEQAwDAPBx/vvTKfJyxhMgLEq3cUVAPxhLdXztOF8klbP04bzSVo9TxvOJ2n1PG04n6TV87ThfJJWz9OGW7oLGUk9pCDtJ6sAAAAASUVORK5CYII=',
       'base64'
@@ -229,6 +297,9 @@ export async function generatePass(passType: PassType, passData: PassData): Prom
     pass.addBuffer('icon.png', simpleIcon);
     pass.addBuffer('icon@2x.png', simpleIcon);
     pass.addBuffer('logo.png', simpleIcon);
+    
+    // Añadir imágenes adicionales si están disponibles
+    // Estas serían implementadas en una versión real pero están fuera del alcance de esta demostración
     
     console.log("Pass configured, generating buffer...");
     

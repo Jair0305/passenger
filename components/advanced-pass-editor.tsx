@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, MouseEvent } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,14 +56,199 @@ export function AdvancedPassEditor({
   selectedElement,
   setSelectedElement
 }: AdvancedPassEditorProps) {
+  const canvasRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizeDirection, setResizeDirection] = useState<string | null>(null);
-  const [startSize, setStartSize] = useState({ width: 0, height: 0 });
-  const [startPosition, setStartPosition] = useState({ x: 0, y: 0 });
+  const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+  const [resizing, setResizing] = useState(false);
+  const [resizeDirection, setResizeDirection] = useState("");
+  const [resizeStartPos, setResizeStartPos] = useState({ x: 0, y: 0 });
+  const [resizeStartDims, setResizeStartDims] = useState({ width: 0, height: 0 });
   
-  const editorRef = useRef<HTMLDivElement>(null);
+  // Manejar clic en el lienzo (para deseleccionar elementos)
+  const handleCanvasClick = (e: MouseEvent) => {
+    // Solo deseleccionar si hacemos clic en el lienzo directamente, no en un elemento
+    if (e.target === canvasRef.current) {
+      setSelectedElement(null);
+    }
+  };
+
+  // Iniciar arrastre de un elemento
+  const handleDragStart = (e: MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (resizing) return; // No iniciar arrastre si estamos redimensionando
+    
+    // Seleccionar el elemento al comenzar a arrastrarlo
+    setSelectedElement(id);
+    
+    setIsDragging(true);
+    
+    // Guardar la posición inicial del clic
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (rect) {
+      setDragStartPos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    }
+  };
+
+  // Manejar el movimiento durante el arrastre
+  const handleDragMove = (e: MouseEvent) => {
+    if (!isDragging || !selectedElement || !canvasRef.current) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+    
+    const deltaX = currentX - dragStartPos.x;
+    const deltaY = currentY - dragStartPos.y;
+    
+    // Actualizar la posición del elemento seleccionado
+    setElements(
+      elements.map(el => {
+        if (el.id === selectedElement) {
+          return {
+            ...el,
+            x: Math.max(0, Math.min(width - el.width, el.x + deltaX)),
+            y: Math.max(0, Math.min(height - el.height, el.y + deltaY))
+          };
+        }
+        return el;
+      })
+    );
+    
+    // Actualizar la posición de inicio para el próximo movimiento
+    setDragStartPos({
+      x: currentX,
+      y: currentY
+    });
+  };
+
+  // Finalizar arrastre
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
+  // Iniciar redimensionamiento
+  const handleResizeStart = (e: MouseEvent, id: string, direction: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    setSelectedElement(id);
+    setResizing(true);
+    setResizeDirection(direction);
+    
+    const element = elements.find(el => el.id === id);
+    if (element) {
+      setResizeStartDims({
+        width: element.width,
+        height: element.height
+      });
+    }
+    
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (rect) {
+      setResizeStartPos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    }
+  };
+
+  // Manejar movimiento durante redimensionamiento
+  const handleResizeMove = (e: MouseEvent) => {
+    if (!resizing || !selectedElement || !canvasRef.current) return;
+    
+    e.stopPropagation();
+    e.preventDefault();
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+    
+    const deltaX = currentX - resizeStartPos.x;
+    const deltaY = currentY - resizeStartPos.y;
+    
+    setElements(
+      elements.map(el => {
+        if (el.id === selectedElement) {
+          let newWidth = el.width;
+          let newHeight = el.height;
+          let newX = el.x;
+          let newY = el.y;
+          
+          // Ajustar dimensiones según la dirección de redimensionamiento
+          if (resizeDirection.includes('e')) {
+            newWidth = Math.max(20, resizeStartDims.width + deltaX);
+          }
+          if (resizeDirection.includes('w')) {
+            const widthChange = Math.min(resizeStartDims.width - 20, deltaX);
+            newWidth = Math.max(20, resizeStartDims.width - widthChange);
+            newX = el.x + widthChange;
+          }
+          if (resizeDirection.includes('s')) {
+            newHeight = Math.max(20, resizeStartDims.height + deltaY);
+          }
+          if (resizeDirection.includes('n')) {
+            const heightChange = Math.min(resizeStartDims.height - 20, deltaY);
+            newHeight = Math.max(20, resizeStartDims.height - heightChange);
+            newY = el.y + heightChange;
+          }
+          
+          return {
+            ...el,
+            width: newWidth,
+            height: newHeight,
+            x: newX,
+            y: newY
+          };
+        }
+        return el;
+      })
+    );
+  };
+
+  // Finalizar redimensionamiento
+  const handleResizeEnd = () => {
+    setResizing(false);
+    setResizeDirection("");
+  };
+  
+  // Registrar y eliminar los manejadores de eventos globales
+  useEffect(() => {
+    // Manejador de eventos para el movimiento del ratón
+    const handleMouseMove = (e: globalThis.MouseEvent) => {
+      if (isDragging) {
+        handleDragMove(e as unknown as MouseEvent);
+      }
+      if (resizing) {
+        handleResizeMove(e as unknown as MouseEvent);
+      }
+    };
+    
+    // Manejador de eventos para la liberación del botón del ratón
+    const handleMouseUp = () => {
+      if (isDragging) {
+        handleDragEnd();
+      }
+      if (resizing) {
+        handleResizeEnd();
+      }
+    };
+    
+    // Registrar los manejadores de eventos
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    // Limpiar los manejadores de eventos al desmontar
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, resizing]);
   
   // Función para añadir un elemento posicionable
   const addPositionableElement = (type: "text" | "image" | "barcode" | "shape" | "custom") => {
@@ -122,106 +307,6 @@ export function AdvancedPassEditor({
     ));
   };
   
-  // Manejador de inicio de arrastre
-  const handleElementMouseDown = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setSelectedElement(id);
-    
-    const element = elements.find(el => el.id === id);
-    if (!element) return;
-    
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    });
-    
-    setIsDragging(true);
-  };
-  
-  // Manejador de movimiento durante arrastre
-  const handleEditorMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !selectedElement || !editorRef.current) return;
-    
-    const editorRect = editorRef.current.getBoundingClientRect();
-    let x = e.clientX - editorRect.left - dragOffset.x;
-    let y = e.clientY - editorRect.top - dragOffset.y;
-    
-    // Limitar dentro del editor
-    const element = elements.find(el => el.id === selectedElement);
-    if (element) {
-      x = Math.max(0, Math.min(width - element.width, x));
-      y = Math.max(0, Math.min(height - element.height, y));
-    }
-    
-    updatePositionableElement(selectedElement, { x, y });
-  };
-  
-  // Manejador para finalizar arrastre
-  const handleEditorMouseUp = () => {
-    setIsDragging(false);
-    setIsResizing(false);
-  };
-  
-  // Manejador para iniciar redimensionamiento
-  const handleResizeStart = (e: React.MouseEvent, id: string, direction: string) => {
-    e.stopPropagation();
-    setSelectedElement(id);
-    
-    const element = elements.find(el => el.id === id);
-    if (!element) return;
-    
-    setIsResizing(true);
-    setResizeDirection(direction);
-    setStartSize({ width: element.width, height: element.height });
-    setStartPosition({ x: element.x, y: element.y });
-    
-    const editorRect = editorRef.current?.getBoundingClientRect();
-    if (editorRect) {
-      setDragOffset({
-        x: e.clientX,
-        y: e.clientY
-      });
-    }
-  };
-  
-  // Componente para manejar esquinas de redimensionamiento
-  const ResizeHandle = ({ 
-    id, 
-    direction 
-  }: { 
-    id: string;
-    direction: string;
-  }) => {
-    const getPositionStyle = () => {
-      switch (direction) {
-        case 'top-left':
-          return { top: -5, left: -5 };
-        case 'top-right':
-          return { top: -5, right: -5 };
-        case 'bottom-left':
-          return { bottom: -5, left: -5 };
-        case 'bottom-right':
-          return { bottom: -5, right: -5 };
-        default:
-          return {};
-      }
-    };
-    
-    return (
-      <div
-        className="absolute w-4 h-4 bg-blue-500 rounded-full cursor-nesw-resize z-50"
-        style={{
-          ...getPositionStyle(),
-          cursor: direction.includes('top-left') || direction.includes('bottom-right') 
-            ? 'nwse-resize' 
-            : 'nesw-resize'
-        }}
-        onMouseDown={(e) => handleResizeStart(e, id, direction)}
-      />
-    );
-  };
-  
   // Renderizar elementos en el editor
   const renderElements = () => {
     return elements.map((element) => (
@@ -235,16 +320,17 @@ export function AdvancedPassEditor({
           height: `${element.height}px`,
           transform: `rotate(${element.rotation}deg)`,
           zIndex: element.zIndex,
-          cursor: 'move',
+          cursor: isDragging ? 'grabbing' : 'grab',
           backgroundColor: element.styles.backgroundColor,
           borderRadius: `${element.styles.borderRadius}px`,
           border: element.styles.borderWidth 
             ? `${element.styles.borderWidth}px solid ${element.styles.borderColor}` 
             : 'none',
-          opacity: element.styles.opacity
+          opacity: element.styles.opacity,
+          touchAction: 'none',
+          userSelect: 'none'
         }}
-        onMouseDown={(e) => handleElementMouseDown(e, element.id)}
-        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => handleDragStart(e, element.id)}
       >
         {element.type === 'text' && (
           <p
@@ -265,35 +351,64 @@ export function AdvancedPassEditor({
           </p>
         )}
         {element.type === 'image' && (
-          <div className="flex items-center justify-center w-full h-full">
+          <div className="w-full h-full">
             {element.content ? (
               <img 
                 src={element.content} 
-                alt="Custom element" 
+                alt="Element" 
                 className="max-w-full max-h-full object-contain pointer-events-none" 
               />
             ) : (
-              <div className="flex flex-col items-center justify-center h-full w-full bg-gray-100 pointer-events-none">
-                <Upload className="h-6 w-6 text-gray-400" />
-                <p className="text-xs text-gray-500">Imagen</p>
+              <div className="h-full w-full flex items-center justify-center pointer-events-none">
+                <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
               </div>
             )}
           </div>
         )}
         {element.type === 'barcode' && (
-          <div className="flex items-center justify-center w-full h-full pointer-events-none">
-            <div className="bg-gray-900 w-full h-full flex items-center justify-center">
-              <QrCode className="h-1/2 w-1/2 text-white" />
-            </div>
+          <div className="w-full h-full flex items-center justify-center pointer-events-none">
+            <svg className="w-6 h-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            </svg>
           </div>
         )}
         
         {selectedElement === element.id && (
           <>
-            <ResizeHandle id={element.id} direction="top-left" />
-            <ResizeHandle id={element.id} direction="top-right" />
-            <ResizeHandle id={element.id} direction="bottom-left" />
-            <ResizeHandle id={element.id} direction="bottom-right" />
+            <div 
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full -top-1.5 -left-1.5 cursor-nw-resize z-10"
+              onMouseDown={(e) => handleResizeStart(e, element.id, 'nw')}
+            />
+            <div 
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full -top-1.5 -right-1.5 cursor-ne-resize z-10"
+              onMouseDown={(e) => handleResizeStart(e, element.id, 'ne')}
+            />
+            <div 
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full -bottom-1.5 -left-1.5 cursor-sw-resize z-10"
+              onMouseDown={(e) => handleResizeStart(e, element.id, 'sw')}
+            />
+            <div 
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full -bottom-1.5 -right-1.5 cursor-se-resize z-10"
+              onMouseDown={(e) => handleResizeStart(e, element.id, 'se')}
+            />
+            <div 
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full top-1/2 -left-1.5 -translate-y-1/2 cursor-w-resize z-10"
+              onMouseDown={(e) => handleResizeStart(e, element.id, 'w')}
+            />
+            <div 
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full top-1/2 -right-1.5 -translate-y-1/2 cursor-e-resize z-10"
+              onMouseDown={(e) => handleResizeStart(e, element.id, 'e')}
+            />
+            <div 
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full -top-1.5 left-1/2 -translate-x-1/2 cursor-n-resize z-10"
+              onMouseDown={(e) => handleResizeStart(e, element.id, 'n')}
+            />
+            <div 
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full -bottom-1.5 left-1/2 -translate-x-1/2 cursor-s-resize z-10"
+              onMouseDown={(e) => handleResizeStart(e, element.id, 's')}
+            />
           </>
         )}
       </div>
@@ -549,17 +664,16 @@ export function AdvancedPassEditor({
       </div>
       
       <div 
-        ref={editorRef}
+        ref={canvasRef}
         className="relative border rounded-md overflow-hidden mx-auto"
         style={{ 
           width: `${width}px`, 
           height: `${height}px`,
-          backgroundColor: backgroundColor 
+          backgroundColor, 
+          maxWidth: '100%',
+          maxHeight: '600px'
         }}
-        onMouseMove={handleEditorMouseMove}
-        onMouseUp={handleEditorMouseUp}
-        onMouseLeave={handleEditorMouseUp}
-        onClick={() => setSelectedElement(null)}
+        onClick={handleCanvasClick}
       >
         {renderElements()}
       </div>
