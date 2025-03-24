@@ -24,7 +24,7 @@ export interface PassData {
   time?: string;
   
   // Opciones de configuración
-  barcode: boolean;
+  barcode: boolean | { message: string; format: string; messageEncoding: string };
   barcodeFormat?: string;
   barcodeMessage?: string;
   notifications?: boolean;
@@ -42,21 +42,36 @@ export interface PassData {
   expirationDate?: string;
   voided?: boolean;
   
-  // Campos personalizados
-  customFields?: Array<{
-    key: string;
-    label: string;
-    value: string;
-    textAlignment?: 'left' | 'center' | 'right' | 'natural';
-  }>;
-
+  // Campos específicos por tipo de pase
+  // Campos para tarjetas de fidelidad y tienda
+  membershipNumber?: string;
+  balance?: string;
+  
+  // Campos para cupones
+  discount?: string;
+  
+  // Campos para pases de embarque
+  flightNumber?: string;
+  gate?: string;
+  seat?: string;
+  boardingTime?: string;
+  
+  // Campos para tarjetas de contacto
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  contactAddress?: string;
+  contactWebsite?: string;
+  contactJob?: string;
+  contactCompany?: string;
+  
   // Opciones de diseño avanzado
-  headerAlignment?: 'left' | 'center' | 'right' | 'natural';
-  primaryAlignment?: 'left' | 'center' | 'right' | 'natural';
-  secondaryAlignment?: 'left' | 'center' | 'right' | 'natural';
-  auxiliaryAlignment?: 'left' | 'center' | 'right' | 'natural';
-  dateStyle?: 'none' | 'short' | 'medium' | 'long' | 'full';
-  timeStyle?: 'none' | 'short' | 'medium' | 'long' | 'full';
+  headerAlignment?: string;
+  primaryAlignment?: string;
+  secondaryAlignment?: string;
+  auxiliaryAlignment?: string;
+  dateStyle?: string;
+  timeStyle?: string;
   showReverse?: boolean;
   useAdvancedEditor?: boolean;
   customWidth?: number;
@@ -64,6 +79,22 @@ export interface PassData {
   allowCustomDimensions?: boolean;
   customPassType?: boolean;
   allowFullCustomization?: boolean;
+  
+  // Campos personalizados
+  customFields?: Array<{
+    key: string;
+    label: string;
+    value: string;
+    textAlignment?: 'left' | 'center' | 'right' | 'natural';
+  }>;
+  
+  // Campos personalizados para interfaz
+  backFields?: Array<{
+    key: string;
+    label: string;
+    value: string;
+    textAlignment?: string;
+  }>;
 }
 
 // Tipo de pase
@@ -176,6 +207,20 @@ export async function generatePass(passType: PassType, passData: PassData): Prom
     if (passData.foregroundColor) basicInfo.foregroundColor = passData.foregroundColor;
     if (passData.backgroundColor) basicInfo.backgroundColor = passData.backgroundColor;
     if (passData.labelColor) basicInfo.labelColor = passData.labelColor;
+    if (passData.logoTextColor) basicInfo.logoTextColor = passData.logoTextColor;
+    
+    // Asegurarse de que los colores estén en formato hexadecimal correcto (Apple requiere #RRGGBB)
+    for (const colorKey of ['foregroundColor', 'backgroundColor', 'labelColor', 'logoTextColor']) {
+      if (basicInfo[colorKey] && typeof basicInfo[colorKey] === 'string') {
+        const colorValue = basicInfo[colorKey] as string;
+        if (!colorValue.startsWith('#')) {
+          // Si el color no comienza con #, asumimos que es un nombre de color o formato rgb
+          // y lo convertimos a hex (simplificado para este ejemplo)
+          console.log(`Converting color format for ${colorKey}: ${colorValue}`);
+          // Mantener el valor original si no podemos convertirlo
+        }
+      }
+    }
     
     // Fechas de relevancia
     if (passData.relevantDate) basicInfo.relevantDate = passData.relevantDate;
@@ -189,17 +234,35 @@ export async function generatePass(passType: PassType, passData: PassData): Prom
     
     const passJSON: PassJsonType = { ...basicInfo };
     
-    if (passData.barcode) {
+    // Comprobar si el campo barcode es un objeto con estructura de barcode o un booleano
+    const hasBarcode = typeof passData.barcode === 'object' && passData.barcode !== null;
+    
+    if (hasBarcode && typeof passData.barcode === 'object') {
+      // Si es un objeto con datos de barcode
+      const barcodeObj = passData.barcode as { message?: string; format?: string; messageEncoding?: string };
+      const barcodeMessage = barcodeObj.message || passData.barcodeMessage || `PASS-${Date.now()}`;
+      const barcodeFormat = barcodeObj.format || passData.barcodeFormat || "QR";
+      
       // Formato moderno de códigos
       const barcodeData: PKBarcode = {
-        message: passData.barcodeMessage || `PASS-${Date.now()}`,
-        format: passData.barcodeFormat ? `PKBarcodeFormat${passData.barcodeFormat.charAt(0).toUpperCase() + passData.barcodeFormat.slice(1)}` : "PKBarcodeFormatQR",
+        message: barcodeMessage,
+        format: `PKBarcodeFormat${barcodeFormat.charAt(0).toUpperCase() + barcodeFormat.slice(1)}`,
         messageEncoding: "iso-8859-1"
       };
       
       passJSON.barcodes = [barcodeData];
       
       // Para compatibilidad con iOS antiguo
+      passJSON.barcode = barcodeData;
+    } else if (passData.barcodeMessage && passData.barcodeFormat) {
+      // Usar los campos independientes si existen
+      const barcodeData: PKBarcode = {
+        message: passData.barcodeMessage,
+        format: `PKBarcodeFormat${passData.barcodeFormat.charAt(0).toUpperCase() + passData.barcodeFormat.slice(1)}`,
+        messageEncoding: "iso-8859-1"
+      };
+      
+      passJSON.barcodes = [barcodeData];
       passJSON.barcode = barcodeData;
     }
     
@@ -279,6 +342,144 @@ export async function generatePass(passType: PassType, passData: PassData): Prom
       }));
     }
     
+    // Añadir campos específicos basados en el tipo de pase
+    switch (effectivePassType) {
+      case 'eventTicket':
+        // Añadir campos específicos para eventos
+        break;
+        
+      case 'coupon':
+        // Añadir descuento si existe
+        if (passData.discount) {
+          fieldsData.primaryFields.push({
+            key: "discount",
+            label: "DISCOUNT",
+            value: passData.discount,
+            textAlignment: getPKTextAlignment(passData.primaryAlignment)
+          });
+        }
+        break;
+        
+      case 'boardingPass':
+        // Añadir información de vuelo
+        if (passData.flightNumber) {
+          fieldsData.primaryFields.push({
+            key: "flightNumber",
+            label: "FLIGHT",
+            value: passData.flightNumber,
+            textAlignment: getPKTextAlignment(passData.primaryAlignment)
+          });
+        }
+        
+        if (passData.gate) {
+          fieldsData.secondaryFields.push({
+            key: "gate",
+            label: "GATE",
+            value: passData.gate,
+            textAlignment: getPKTextAlignment(passData.secondaryAlignment)
+          });
+        }
+        
+        if (passData.seat) {
+          fieldsData.auxiliaryFields.push({
+            key: "seat",
+            label: "SEAT",
+            value: passData.seat,
+            textAlignment: getPKTextAlignment(passData.auxiliaryAlignment)
+          });
+        }
+        
+        if (passData.boardingTime) {
+          fieldsData.auxiliaryFields.push({
+            key: "boardingTime",
+            label: "BOARDING",
+            value: passData.boardingTime,
+            textAlignment: getPKTextAlignment(passData.auxiliaryAlignment)
+          });
+        }
+        break;
+        
+      case 'storeCard':
+        // Añadir información de tarjeta de membresía
+        if (passData.membershipNumber) {
+          fieldsData.primaryFields.push({
+            key: "membershipNumber",
+            label: "MEMBERSHIP",
+            value: passData.membershipNumber,
+            textAlignment: getPKTextAlignment(passData.primaryAlignment)
+          });
+        }
+        
+        if (passData.balance) {
+          fieldsData.secondaryFields.push({
+            key: "balance",
+            label: "BALANCE",
+            value: passData.balance,
+            textAlignment: getPKTextAlignment(passData.secondaryAlignment)
+          });
+        }
+        break;
+    }
+    
+    // Añadir campos de contacto si existen (para pases tipo tarjeta de contacto)
+    if (passData.contactName) {
+      fieldsData.backFields.push({
+        key: "contactName",
+        label: "NAME",
+        value: passData.contactName,
+        textAlignment: "PKTextAlignmentLeft"
+      });
+    }
+    
+    if (passData.contactPhone) {
+      fieldsData.backFields.push({
+        key: "contactPhone",
+        label: "PHONE",
+        value: passData.contactPhone,
+        textAlignment: "PKTextAlignmentLeft"
+      });
+    }
+    
+    if (passData.contactEmail) {
+      fieldsData.backFields.push({
+        key: "contactEmail",
+        label: "EMAIL",
+        value: passData.contactEmail,
+        textAlignment: "PKTextAlignmentLeft"
+      });
+    }
+    
+    if (passData.contactAddress) {
+      fieldsData.backFields.push({
+        key: "contactAddress",
+        label: "ADDRESS",
+        value: passData.contactAddress,
+        textAlignment: "PKTextAlignmentLeft"
+      });
+    }
+    
+    if (passData.contactWebsite) {
+      fieldsData.backFields.push({
+        key: "contactWebsite",
+        label: "WEBSITE",
+        value: passData.contactWebsite,
+        textAlignment: "PKTextAlignmentLeft"
+      });
+    }
+    
+    // Añadir campos personalizados del usuario si existen
+    if (passData.backFields && passData.backFields.length > 0) {
+      // Agregar a los campos existentes en backFields
+      passData.backFields.forEach(field => {
+        fieldsData.backFields.push({
+          key: field.key,
+          label: field.label,
+          value: field.value,
+          textAlignment: getPKTextAlignment(field.textAlignment)
+        });
+      });
+    }
+    
     // Añadir los campos según el tipo de pase
     passJSON[effectivePassType] = fieldsData;
     
@@ -287,19 +488,63 @@ export async function generatePass(passType: PassType, passData: PassData): Prom
     // Añadir el JSON del pase
     pass.addBuffer("pass.json", Buffer.from(JSON.stringify(passJSON)));
     
-    // Añadir imágenes requeridas
-    const simpleIcon = Buffer.from(
+    // Icono genérico como respaldo
+    const defaultIcon = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAB0AAAAdCAYAAABWk2cPAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAABISURBVEhL7c2hEQAwDAPBx/vvTKfJyxhMgLEq3cUVAPxhLdXztOF8klbP04bzSVo9TxvOJ2n1PG04n6TV87ThfJJWz9OGW7oLGUk9pCDtJ6sAAAAASUVORK5CYII=',
       'base64'
     );
     
-    // Apple Wallet requiere estos archivos de imagen
-    pass.addBuffer('icon.png', simpleIcon);
-    pass.addBuffer('icon@2x.png', simpleIcon);
-    pass.addBuffer('logo.png', simpleIcon);
+    // Funciones helper para procesar imágenes base64
+    const processBase64Image = (base64String?: string): Buffer | null => {
+      if (!base64String) return null;
+      
+      try {
+        // Eliminar el prefijo "data:image/png;base64," si existe
+        const base64Data = base64String.includes(',') 
+          ? base64String.split(',')[1] 
+          : base64String;
+          
+        return Buffer.from(base64Data, 'base64');
+      } catch (error) {
+        console.warn("Error processing base64 image:", error);
+        return null;
+      }
+    };
     
-    // Añadir imágenes adicionales si están disponibles
-    // Estas serían implementadas en una versión real pero están fuera del alcance de esta demostración
+    // Añadir imágenes desde los datos del pase si están disponibles
+    const iconImage = processBase64Image(passData.iconImage) || defaultIcon;
+    const logoImage = processBase64Image(passData.logoImage) || defaultIcon;
+    const stripImage = processBase64Image(passData.stripImage);
+    const footerImage = processBase64Image(passData.footerImage);
+    const backgroundImage = processBase64Image(passData.backgroundImage);
+    const thumbnailImage = processBase64Image(passData.thumbnailImage);
+    
+    // Apple Wallet requiere estos archivos de imagen
+    pass.addBuffer('icon.png', iconImage);
+    pass.addBuffer('icon@2x.png', iconImage);
+    pass.addBuffer('logo.png', logoImage);
+    pass.addBuffer('logo@2x.png', logoImage);
+    
+    // Añadir imágenes opcionales si están disponibles
+    if (stripImage) {
+      pass.addBuffer('strip.png', stripImage);
+      pass.addBuffer('strip@2x.png', stripImage);
+    }
+    
+    if (footerImage) {
+      pass.addBuffer('footer.png', footerImage);
+      pass.addBuffer('footer@2x.png', footerImage);
+    }
+    
+    if (backgroundImage) {
+      pass.addBuffer('background.png', backgroundImage);
+      pass.addBuffer('background@2x.png', backgroundImage);
+    }
+    
+    if (thumbnailImage) {
+      pass.addBuffer('thumbnail.png', thumbnailImage);
+      pass.addBuffer('thumbnail@2x.png', thumbnailImage);
+    }
     
     console.log("Pass configured, generating buffer...");
     

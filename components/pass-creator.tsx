@@ -367,7 +367,7 @@ export function PassCreator() {
   }, [])
   
   // Función para generar y descargar el pase
-  const generateAndDownloadPass = async () => {
+  const generateAndDownloadPass = async (installDirectly = false) => {
     try {
       setIsGenerating(true)
       setGenerationError(null)
@@ -419,22 +419,51 @@ export function PassCreator() {
       // Obtener el blob del pase
       const passBlob = await response.blob()
       
-      // Crear un enlace de descarga
-      const downloadUrl = URL.createObjectURL(passBlob)
-      const a = document.createElement('a')
-      a.href = downloadUrl
-      a.download = `${passData.title.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.pkpass`
-      document.body.appendChild(a)
-      a.click()
+      if (installDirectly) {
+        // Para instalar directamente en Apple Wallet (dispositivos iOS/macOS)
+        
+        // Crear un objeto URL para el blob con el tipo MIME correcto
+        const passObjectURL = URL.createObjectURL(
+          new Blob([passBlob], { type: 'application/vnd.apple.pkpass' })
+        );
+        
+        // En dispositivos iOS/macOS, esto abrirá directamente Apple Wallet
+        // En otros dispositivos, se descargará el archivo
+        window.location.href = passObjectURL;
+        
+        // Mostrar mensaje informativo para usuarios que no están en iOS/macOS
+        if (!(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent))) {
+          setTimeout(() => {
+            alert("Para instalar el pase en Apple Wallet, necesitas usar un dispositivo iOS o macOS. El archivo ha sido descargado en tu dispositivo.");
+          }, 1000);
+        }
+        
+        // Limpiar el objeto URL después de un tiempo razonable
+        setTimeout(() => {
+          URL.revokeObjectURL(passObjectURL);
+        }, 5000);
+      } else {
+        // Para descargar el archivo como .pkpass
+        const downloadUrl = URL.createObjectURL(
+          new Blob([passBlob], { type: 'application/vnd.apple.pkpass' })
+        );
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `${passData.title.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.pkpass`;
+        document.body.appendChild(a);
+        a.click();
       
       // Limpiar
-      URL.revokeObjectURL(downloadUrl)
-      document.body.removeChild(a)
+        setTimeout(() => {
+          URL.revokeObjectURL(downloadUrl);
+          document.body.removeChild(a);
+        }, 100);
+      }
     } catch (error) {
-      console.error('Error generating pass:', error)
-      setGenerationError(error instanceof Error ? error.message : String(error))
+      console.error('Error generating pass:', error);
+      setGenerationError(error instanceof Error ? error.message : String(error));
     } finally {
-      setIsGenerating(false)
+      setIsGenerating(false);
     }
   }
 
@@ -580,7 +609,7 @@ export function PassCreator() {
               <TabsContent value="design" className="space-y-4 mt-4">
                 <Card>
                   <CardContent className="pt-6 space-y-4">
-                      {/* Tipo de pase - ELIMINADO DE AQUÍ Y MOVIDO ARRIBA */}
+                        {/* Tipo de pase - ELIMINADO DE AQUÍ Y MOVIDO ARRIBA */}
                     
                     {/* Colores */}
                     <div className="border rounded-md p-4 space-y-4">
@@ -653,26 +682,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
-                                {passData.logoImage ? (
-                                  <div className="w-16 h-16 mb-2 rounded-lg overflow-hidden">
-                                    <img 
-                                      src={passData.logoImage} 
-                                      alt="Logo Preview" 
-                                      className="w-full h-full object-cover" 
-                                    />
-                                  </div>
-                                ) : (
+                                  {passData.logoImage ? (
+                                    <div className="w-16 h-16 mb-2 rounded-lg overflow-hidden">
+                                      <img 
+                                        src={passData.logoImage} 
+                                        alt="Logo Preview" 
+                                        className="w-full h-full object-cover" 
+                                      />
+                                    </div>
+                                  ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
-                                )}
+                                  )}
                               <p className="text-xs text-gray-500 dark:text-gray-400">Logo principal</p>
                             </div>
-                              <input 
-                                id="logoUpload" 
-                                type="file" 
-                                className="hidden" 
-                                accept="image/*"
-                                onChange={(e) => handleImageUpload(e, 'logoImage')}
-                              />
+                                <input 
+                                  id="logoUpload" 
+                                  type="file" 
+                                  className="hidden" 
+                                  accept="image/*"
+                                  onChange={(e) => handleImageUpload(e, 'logoImage')}
+                                />
                           </label>
                         </div>
                       </div>
@@ -685,26 +714,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
-                                {passData.iconImage ? (
-                                  <div className="w-16 h-16 mb-2 rounded-lg overflow-hidden">
-                                    <img 
-                                      src={passData.iconImage} 
-                                      alt="Icon Preview" 
-                                      className="w-full h-full object-cover" 
-                                    />
-                                  </div>
-                                ) : (
+                                  {passData.iconImage ? (
+                                    <div className="w-16 h-16 mb-2 rounded-lg overflow-hidden">
+                                      <img 
+                                        src={passData.iconImage} 
+                                        alt="Icon Preview" 
+                                        className="w-full h-full object-cover" 
+                                      />
+                                    </div>
+                                  ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
-                                )}
+                                  )}
                               <p className="text-xs text-gray-500 dark:text-gray-400">Icono para notificaciones</p>
                             </div>
-                              <input 
-                                id="iconUpload" 
-                                type="file" 
-                                className="hidden" 
-                                accept="image/*"
-                                onChange={(e) => handleImageUpload(e, 'iconImage')}
-                              />
+                                <input 
+                                  id="iconUpload" 
+                                  type="file" 
+                                  className="hidden" 
+                                  accept="image/*"
+                                  onChange={(e) => handleImageUpload(e, 'iconImage')}
+                                />
                           </label>
                         </div>
                       </div>
@@ -717,26 +746,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
-                                {passData.stripImage ? (
-                                  <div className="w-20 h-10 mb-2 rounded-lg overflow-hidden">
-                                    <img 
-                                      src={passData.stripImage} 
-                                      alt="Strip Preview" 
-                                      className="w-full h-full object-cover" 
-                                    />
-                                  </div>
-                                ) : (
+                                  {passData.stripImage ? (
+                                    <div className="w-20 h-10 mb-2 rounded-lg overflow-hidden">
+                                      <img 
+                                        src={passData.stripImage} 
+                                        alt="Strip Preview" 
+                                        className="w-full h-full object-cover" 
+                                      />
+                                    </div>
+                                  ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
-                                )}
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Imagen de la parte superior</p>
+                                  )}
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Imagen de la parte superior</p>
                             </div>
-                              <input 
-                                id="stripUpload" 
-                                type="file" 
-                                className="hidden" 
-                                accept="image/*"
-                                onChange={(e) => handleImageUpload(e, 'stripImage')}
-                              />
+                                <input 
+                                  id="stripUpload" 
+                                  type="file" 
+                                  className="hidden" 
+                                  accept="image/*"
+                                  onChange={(e) => handleImageUpload(e, 'stripImage')}
+                                />
                           </label>
                         </div>
                       </div>
@@ -749,26 +778,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
-                                {passData.backgroundImage ? (
-                                  <div className="w-16 h-20 mb-2 rounded-lg overflow-hidden">
-                                    <img 
-                                      src={passData.backgroundImage} 
-                                      alt="Background Preview" 
-                                      className="w-full h-full object-cover" 
-                                    />
-                                  </div>
-                                ) : (
+                                  {passData.backgroundImage ? (
+                                    <div className="w-16 h-20 mb-2 rounded-lg overflow-hidden">
+                                      <img 
+                                        src={passData.backgroundImage} 
+                                        alt="Background Preview" 
+                                        className="w-full h-full object-cover" 
+                                      />
+                                    </div>
+                                  ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
-                                )}
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Imagen de fondo</p>
+                                  )}
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Imagen de fondo</p>
                             </div>
-                              <input 
-                                id="backgroundUpload" 
-                                type="file" 
-                                className="hidden" 
-                                accept="image/*"
-                                onChange={(e) => handleImageUpload(e, 'backgroundImage')}
-                              />
+                                <input 
+                                  id="backgroundUpload" 
+                                  type="file" 
+                                  className="hidden" 
+                                  accept="image/*"
+                                  onChange={(e) => handleImageUpload(e, 'backgroundImage')}
+                                />
                           </label>
                         </div>
                       </div>
@@ -781,26 +810,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
-                                {passData.thumbnailImage ? (
-                                  <div className="w-16 h-16 mb-2 rounded-lg overflow-hidden">
-                                    <img 
-                                      src={passData.thumbnailImage} 
-                                      alt="Thumbnail Preview" 
-                                      className="w-full h-full object-cover" 
-                                    />
-                                  </div>
-                                ) : (
+                                  {passData.thumbnailImage ? (
+                                    <div className="w-16 h-16 mb-2 rounded-lg overflow-hidden">
+                                      <img 
+                                        src={passData.thumbnailImage} 
+                                        alt="Thumbnail Preview" 
+                                        className="w-full h-full object-cover" 
+                                      />
+                                    </div>
+                                  ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
-                                )}
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Miniatura central</p>
+                                  )}
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Miniatura central</p>
                             </div>
-                              <input 
-                                id="thumbnailUpload" 
-                                type="file" 
-                                className="hidden" 
-                                accept="image/*"
-                                onChange={(e) => handleImageUpload(e, 'thumbnailImage')}
-                              />
+                                <input 
+                                  id="thumbnailUpload" 
+                                  type="file" 
+                                  className="hidden" 
+                                  accept="image/*"
+                                  onChange={(e) => handleImageUpload(e, 'thumbnailImage')}
+                                />
                           </label>
                         </div>
                       </div>
@@ -813,26 +842,26 @@ export function PassCreator() {
                             className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
                           >
                             <div className="flex flex-col items-center justify-center pt-3 pb-3">
-                                {passData.footerImage ? (
-                                  <div className="w-24 h-8 mb-2 rounded-lg overflow-hidden">
-                                    <img 
-                                      src={passData.footerImage} 
-                                      alt="Footer Preview" 
-                                      className="w-full h-full object-cover" 
-                                    />
-                                  </div>
-                                ) : (
+                                  {passData.footerImage ? (
+                                    <div className="w-24 h-8 mb-2 rounded-lg overflow-hidden">
+                                      <img 
+                                        src={passData.footerImage} 
+                                        alt="Footer Preview" 
+                                        className="w-full h-full object-cover" 
+                                      />
+                                    </div>
+                                  ) : (
                               <Upload className="w-6 h-6 mb-2 text-gray-500 dark:text-gray-400" />
-                                )}
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Imagen de pie de página</p>
+                                  )}
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Imagen de pie de página</p>
                             </div>
-                              <input 
-                                id="footerUpload" 
-                                type="file" 
-                                className="hidden" 
-                                accept="image/*"
-                                onChange={(e) => handleImageUpload(e, 'footerImage')}
-                              />
+                                <input 
+                                  id="footerUpload" 
+                                  type="file" 
+                                  className="hidden" 
+                                  accept="image/*"
+                                  onChange={(e) => handleImageUpload(e, 'footerImage')}
+                                />
                           </label>
                         </div>
                       </div>
@@ -849,36 +878,36 @@ export function PassCreator() {
                         </div>
                         <Switch
                           id="barcode"
-                            checked={passData.barcode.message !== ""}
-                            onCheckedChange={(checked) => {
-                              handleChange("barcode.message", checked ? "Executive Engineers Conference" : "");
-                              handleChange("barcode.format", checked ? "QR" : "");
-                              handleChange("barcode.messageEncoding", checked ? "iso-8859-1" : "");
-                            }}
+                              checked={passData.barcode.message !== ""}
+                              onCheckedChange={(checked) => {
+                                handleChange("barcode.message", checked ? "Executive Engineers Conference" : "");
+                                handleChange("barcode.format", checked ? "QR" : "");
+                                handleChange("barcode.messageEncoding", checked ? "iso-8859-1" : "");
+                              }}
                         />
                       </div>
                       
-                        {passData.barcode.message && (
+                          {passData.barcode.message && (
                         <div className="space-y-2">
                           <Label>Formato del Código</Label>
                           <div className="space-y-2">
                             <div className="flex items-center space-x-2">
                               <input 
                                 type="radio" 
-                                id="QR" 
-                                value="QR" 
-                                  checked={passData.barcode.format === "QR"}
-                                  onChange={() => handleChange("barcode.format", "QR")}
-                              />
-                              <Label htmlFor="QR">QR Code</Label>
+                                  id="QR" 
+                                  value="QR" 
+                                    checked={passData.barcode.format === "QR"}
+                                    onChange={() => handleChange("barcode.format", "QR")}
+                                />
+                                <Label htmlFor="QR">QR Code</Label>
                             </div>
                             <div className="flex items-center space-x-2">
                               <input 
                                 type="radio" 
                                 id="pdf417" 
                                 value="pdf417" 
-                                  checked={passData.barcode.format === "pdf417"}
-                                  onChange={() => handleChange("barcode.format", "pdf417")}
+                                    checked={passData.barcode.format === "pdf417"}
+                                    onChange={() => handleChange("barcode.format", "pdf417")}
                               />
                               <Label htmlFor="pdf417">PDF417</Label>
                             </div>
@@ -887,8 +916,8 @@ export function PassCreator() {
                                 type="radio" 
                                 id="aztec" 
                                 value="aztec" 
-                                  checked={passData.barcode.format === "aztec"}
-                                  onChange={() => handleChange("barcode.format", "aztec")}
+                                    checked={passData.barcode.format === "aztec"}
+                                    onChange={() => handleChange("barcode.format", "aztec")}
                               />
                               <Label htmlFor="aztec">Aztec</Label>
                             </div>
@@ -897,8 +926,8 @@ export function PassCreator() {
                                 type="radio" 
                                 id="code128" 
                                 value="code128" 
-                                  checked={passData.barcode.format === "code128"}
-                                  onChange={() => handleChange("barcode.format", "code128")}
+                                    checked={passData.barcode.format === "code128"}
+                                    onChange={() => handleChange("barcode.format", "code128")}
                               />
                               <Label htmlFor="code128">Code 128</Label>
                             </div>
@@ -952,17 +981,17 @@ export function PassCreator() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="logoText">Texto del Logo</Label>
-                          <Input
-                            id="logoText"
-                            value={passData.logoText}
-                            onChange={(e) => handleChange("logoText", e.target.value)}
-                            maxLength={4}
-                          />
-                        </div>
-                        
-                        {(passType === "event" || passType === "generic" || passType === "coupon") && (
+                          <div className="space-y-2">
+                            <Label htmlFor="logoText">Texto del Logo</Label>
+                            <Input
+                              id="logoText"
+                              value={passData.logoText}
+                              onChange={(e) => handleChange("logoText", e.target.value)}
+                              maxLength={4}
+                            />
+                          </div>
+                          
+                          {(passType === "event" || passType === "generic" || passType === "coupon") && (
                       <div className="space-y-2">
                         <Label htmlFor="location">Ubicación</Label>
                         <Input
@@ -971,238 +1000,238 @@ export function PassCreator() {
                           onChange={(e) => handleChange("location", e.target.value)}
                         />
                       </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
 
-                      {/* Campos específicos según el tipo de pase */}
-                      {passType === "event" && (
-                        <div className="border rounded-md p-4 space-y-4">
-                          <h3 className="text-base font-medium">Detalles del Evento</h3>
-                          <div className="grid grid-cols-2 gap-4">
+                        {/* Campos específicos según el tipo de pase */}
+                        {passType === "event" && (
+                          <div className="border rounded-md p-4 space-y-4">
+                            <h3 className="text-base font-medium">Detalles del Evento</h3>
+                            <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                              <Label htmlFor="date">Fecha</Label>
+                                <Label htmlFor="date">Fecha</Label>
                         <Input
+                                  id="date"
+                                  type="date"
+                                  value={passData.date}
+                                  onChange={(e) => handleChange("date", e.target.value)}
+                        />
+                      </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="time">Hora</Label>
+                                <Input
+                                  id="time"
+                                  type="time"
+                                  value={passData.time}
+                                  onChange={(e) => handleChange("time", e.target.value)}
+                                />
+                    </div>
+                        </div>
+                          </div>
+                        )}
+
+                        {passType === "loyalty" && (
+                          <div className="border rounded-md p-4 space-y-4">
+                            <h3 className="text-base font-medium">Detalles de Fidelidad</h3>
+                            <div className="space-y-2">
+                              <Label htmlFor="membershipNumber">Número de Socio</Label>
+                              <Input
+                                id="membershipNumber"
+                                value={passData.membershipNumber}
+                                onChange={(e) => handleChange("membershipNumber", e.target.value)}
+                                placeholder="1234567890"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="balance">Saldo de Puntos</Label>
+                              <Input
+                                id="balance"
+                                value={passData.balance}
+                                onChange={(e) => handleChange("balance", e.target.value)}
+                                placeholder="150 puntos"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {passType === "coupon" && (
+                          <div className="border rounded-md p-4 space-y-4">
+                            <h3 className="text-base font-medium">Detalles del Cupón</h3>
+                            <div className="space-y-2">
+                              <Label htmlFor="discount">Descuento</Label>
+                              <Input
+                                id="discount"
+                                value={passData.discount}
+                                onChange={(e) => handleChange("discount", e.target.value)}
+                                placeholder="20% DESCUENTO"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="expirationDate">Fecha de Expiración</Label>
+                              <Input
+                                id="expirationDate"
+                                type="datetime-local"
+                                value={passData.expirationDate}
+                                onChange={(e) => handleChange("expirationDate", e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {passType === "boarding" && (
+                          <div className="border rounded-md p-4 space-y-4">
+                            <h3 className="text-base font-medium">Detalles de Embarque</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="flightNumber">Número de Vuelo</Label>
+                                <Input
+                                  id="flightNumber"
+                                  value={passData.flightNumber}
+                                  onChange={(e) => handleChange("flightNumber", e.target.value)}
+                                  placeholder="AB123"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="gate">Puerta</Label>
+                                <Input
+                                  id="gate"
+                                  value={passData.gate}
+                                  onChange={(e) => handleChange("gate", e.target.value)}
+                                  placeholder="B12"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="seat">Asiento</Label>
+                                <Input
+                                  id="seat"
+                                  value={passData.seat}
+                                  onChange={(e) => handleChange("seat", e.target.value)}
+                                  placeholder="23A"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="boardingTime">Hora de Embarque</Label>
+                                <Input
+                                  id="boardingTime"
+                                  value={passData.boardingTime}
+                                  onChange={(e) => handleChange("boardingTime", e.target.value)}
+                                  placeholder="11:30"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="date">Fecha de Vuelo</Label>
+                              <Input
                                 id="date"
                                 type="date"
                                 value={passData.date}
                                 onChange={(e) => handleChange("date", e.target.value)}
-                        />
-                      </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="time">Hora</Label>
-                              <Input
-                                id="time"
-                                type="time"
-                                value={passData.time}
-                                onChange={(e) => handleChange("time", e.target.value)}
-                              />
-                    </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {passType === "loyalty" && (
-                        <div className="border rounded-md p-4 space-y-4">
-                          <h3 className="text-base font-medium">Detalles de Fidelidad</h3>
-                          <div className="space-y-2">
-                            <Label htmlFor="membershipNumber">Número de Socio</Label>
-                            <Input
-                              id="membershipNumber"
-                              value={passData.membershipNumber}
-                              onChange={(e) => handleChange("membershipNumber", e.target.value)}
-                              placeholder="1234567890"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="balance">Saldo de Puntos</Label>
-                            <Input
-                              id="balance"
-                              value={passData.balance}
-                              onChange={(e) => handleChange("balance", e.target.value)}
-                              placeholder="150 puntos"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {passType === "coupon" && (
-                        <div className="border rounded-md p-4 space-y-4">
-                          <h3 className="text-base font-medium">Detalles del Cupón</h3>
-                          <div className="space-y-2">
-                            <Label htmlFor="discount">Descuento</Label>
-                            <Input
-                              id="discount"
-                              value={passData.discount}
-                              onChange={(e) => handleChange("discount", e.target.value)}
-                              placeholder="20% DESCUENTO"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="expirationDate">Fecha de Expiración</Label>
-                            <Input
-                              id="expirationDate"
-                              type="datetime-local"
-                              value={passData.expirationDate}
-                              onChange={(e) => handleChange("expirationDate", e.target.value)}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {passType === "boarding" && (
-                        <div className="border rounded-md p-4 space-y-4">
-                          <h3 className="text-base font-medium">Detalles de Embarque</h3>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="flightNumber">Número de Vuelo</Label>
-                              <Input
-                                id="flightNumber"
-                                value={passData.flightNumber}
-                                onChange={(e) => handleChange("flightNumber", e.target.value)}
-                                placeholder="AB123"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="gate">Puerta</Label>
-                              <Input
-                                id="gate"
-                                value={passData.gate}
-                                onChange={(e) => handleChange("gate", e.target.value)}
-                                placeholder="B12"
                               />
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="seat">Asiento</Label>
-                              <Input
-                                id="seat"
-                                value={passData.seat}
-                                onChange={(e) => handleChange("seat", e.target.value)}
-                                placeholder="23A"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="boardingTime">Hora de Embarque</Label>
-                              <Input
-                                id="boardingTime"
-                                value={passData.boardingTime}
-                                onChange={(e) => handleChange("boardingTime", e.target.value)}
-                                placeholder="11:30"
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="date">Fecha de Vuelo</Label>
-                            <Input
-                              id="date"
-                              type="date"
-                              value={passData.date}
-                              onChange={(e) => handleChange("date", e.target.value)}
-                            />
-                          </div>
-                        </div>
-                      )}
+                        )}
 
-                      {passType === "storeCard" && (
-                        <div className="border rounded-md p-4 space-y-4">
-                          <h3 className="text-base font-medium">Detalles de Tarjeta</h3>
-                          <div className="space-y-2">
-                            <Label htmlFor="membershipNumber">Número de Tarjeta</Label>
-                            <Input
-                              id="membershipNumber"
-                              value={passData.membershipNumber}
-                              onChange={(e) => handleChange("membershipNumber", e.target.value)}
-                              placeholder="1234-5678-9012"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="balance">Saldo</Label>
-                            <Input
-                              id="balance"
-                              value={passData.balance}
-                              onChange={(e) => handleChange("balance", e.target.value)}
-                              placeholder="50,00 €"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {passType === "contact" && (
-                        <div className="border rounded-md p-4 space-y-4">
-                          <h3 className="text-base font-medium">Información de Contacto</h3>
-                          <div className="space-y-2">
-                            <Label htmlFor="contactName">Nombre Completo</Label>
-                            <Input
-                              id="contactName"
-                              value={passData.contactName}
-                              onChange={(e) => handleChange("contactName", e.target.value)}
-                              placeholder="Juan Pérez"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="contactJob">Cargo</Label>
-                            <Input
-                              id="contactJob"
-                              value={passData.contactJob}
-                              onChange={(e) => handleChange("contactJob", e.target.value)}
-                              placeholder="Director de Marketing"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="contactCompany">Empresa</Label>
-                            <Input
-                              id="contactCompany"
-                              value={passData.contactCompany}
-                              onChange={(e) => handleChange("contactCompany", e.target.value)}
-                              placeholder="Empresa S.A."
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
+                        {passType === "storeCard" && (
+                          <div className="border rounded-md p-4 space-y-4">
+                            <h3 className="text-base font-medium">Detalles de Tarjeta</h3>
                             <div className="space-y-2">
-                              <Label htmlFor="contactPhone">Teléfono</Label>
+                              <Label htmlFor="membershipNumber">Número de Tarjeta</Label>
                               <Input
-                                id="contactPhone"
-                                value={passData.contactPhone}
-                                onChange={(e) => handleChange("contactPhone", e.target.value)}
-                                placeholder="+34 600 000 000"
+                                id="membershipNumber"
+                                value={passData.membershipNumber}
+                                onChange={(e) => handleChange("membershipNumber", e.target.value)}
+                                placeholder="1234-5678-9012"
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="contactEmail">Email</Label>
+                              <Label htmlFor="balance">Saldo</Label>
                               <Input
-                                id="contactEmail"
-                                value={passData.contactEmail}
-                                onChange={(e) => handleChange("contactEmail", e.target.value)}
-                                placeholder="ejemplo@email.com"
-                                type="email"
+                                id="balance"
+                                value={passData.balance}
+                                onChange={(e) => handleChange("balance", e.target.value)}
+                                placeholder="50,00 €"
                               />
                             </div>
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="contactWebsite">Sitio Web</Label>
-                            <Input
-                              id="contactWebsite"
-                              value={passData.contactWebsite}
-                              onChange={(e) => handleChange("contactWebsite", e.target.value)}
-                              placeholder="https://www.ejemplo.com"
-                              type="url"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="contactAddress">Dirección</Label>
-                            <Textarea
-                              id="contactAddress"
-                              value={passData.contactAddress}
-                              onChange={(e) => handleChange("contactAddress", e.target.value)}
-                              placeholder="Calle Ejemplo 123, 28001 Madrid, España"
-                              rows={2}
-                            />
-                          </div>
-                        </div>
-                      )}
+                        )}
 
-                      {passType === "generic" && (
+                        {passType === "contact" && (
+                          <div className="border rounded-md p-4 space-y-4">
+                            <h3 className="text-base font-medium">Información de Contacto</h3>
+                            <div className="space-y-2">
+                              <Label htmlFor="contactName">Nombre Completo</Label>
+                              <Input
+                                id="contactName"
+                                value={passData.contactName}
+                                onChange={(e) => handleChange("contactName", e.target.value)}
+                                placeholder="Juan Pérez"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="contactJob">Cargo</Label>
+                              <Input
+                                id="contactJob"
+                                value={passData.contactJob}
+                                onChange={(e) => handleChange("contactJob", e.target.value)}
+                                placeholder="Director de Marketing"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="contactCompany">Empresa</Label>
+                              <Input
+                                id="contactCompany"
+                                value={passData.contactCompany}
+                                onChange={(e) => handleChange("contactCompany", e.target.value)}
+                                placeholder="Empresa S.A."
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="contactPhone">Teléfono</Label>
+                                <Input
+                                  id="contactPhone"
+                                  value={passData.contactPhone}
+                                  onChange={(e) => handleChange("contactPhone", e.target.value)}
+                                  placeholder="+34 600 000 000"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="contactEmail">Email</Label>
+                                <Input
+                                  id="contactEmail"
+                                  value={passData.contactEmail}
+                                  onChange={(e) => handleChange("contactEmail", e.target.value)}
+                                  placeholder="ejemplo@email.com"
+                                  type="email"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="contactWebsite">Sitio Web</Label>
+                              <Input
+                                id="contactWebsite"
+                                value={passData.contactWebsite}
+                                onChange={(e) => handleChange("contactWebsite", e.target.value)}
+                                placeholder="https://www.ejemplo.com"
+                                type="url"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="contactAddress">Dirección</Label>
+                              <Textarea
+                                id="contactAddress"
+                                value={passData.contactAddress}
+                                onChange={(e) => handleChange("contactAddress", e.target.value)}
+                                placeholder="Calle Ejemplo 123, 28001 Madrid, España"
+                                rows={2}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {passType === "generic" && (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="date">Fecha</Label>
@@ -1221,32 +1250,32 @@ export function PassCreator() {
                           value={passData.time}
                           onChange={(e) => handleChange("time", e.target.value)}
                         />
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      
-                      <div className="border rounded-md p-4 space-y-4">
-                        <h3 className="text-base font-medium">Fechas Importantes</h3>
-                        <div className="space-y-2">
-                          <Label htmlFor="relevantDate">Fecha Relevante</Label>
-                          <Input
-                            id="relevantDate"
-                            type="datetime-local"
-                            value={passData.relevantDate}
-                            onChange={(e) => handleChange("relevantDate", e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">Cuándo el pase será relevante para mostrar</p>
-                        </div>
+                        )}
                         
-                        <div className="space-y-2">
-                          <Label htmlFor="expirationDate">Fecha de Expiración</Label>
-                          <Input
-                            id="expirationDate"
-                            type="datetime-local"
-                            value={passData.expirationDate}
-                            onChange={(e) => handleChange("expirationDate", e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">Cuándo el pase expirará</p>
+                        <div className="border rounded-md p-4 space-y-4">
+                          <h3 className="text-base font-medium">Fechas Importantes</h3>
+                          <div className="space-y-2">
+                            <Label htmlFor="relevantDate">Fecha Relevante</Label>
+                            <Input
+                              id="relevantDate"
+                              type="datetime-local"
+                              value={passData.relevantDate}
+                              onChange={(e) => handleChange("relevantDate", e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">Cuándo el pase será relevante para mostrar</p>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="expirationDate">Fecha de Expiración</Label>
+                            <Input
+                              id="expirationDate"
+                              type="datetime-local"
+                              value={passData.expirationDate}
+                              onChange={(e) => handleChange("expirationDate", e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">Cuándo el pase expirará</p>
                       </div>
                     </div>
                   </CardContent>
@@ -1389,13 +1418,13 @@ export function PassCreator() {
                       <Switch
                         id="useAdvancedEditor"
                         checked={passData.useAdvancedEditor}
-                          onCheckedChange={(checked) => {
-                            handleChange("useAdvancedEditor", checked);
-                            // Si desactivamos el editor avanzado, también desactivamos personalización completa
-                            if (!checked) {
-                              handleChange("allowFullCustomization", false);
-                            }
-                          }}
+                            onCheckedChange={(checked) => {
+                              handleChange("useAdvancedEditor", checked);
+                              // Si desactivamos el editor avanzado, también desactivamos personalización completa
+                              if (!checked) {
+                                handleChange("allowFullCustomization", false);
+                              }
+                            }}
                       />
                     </div>
                     
@@ -1461,13 +1490,13 @@ export function PassCreator() {
                       <Switch
                         id="allowFullCustomization"
                         checked={passData.allowFullCustomization}
-                          onCheckedChange={(checked) => {
-                            // Si se activa la personalización completa, también activar el editor avanzado
-                            if (checked) {
-                              handleChange("useAdvancedEditor", true);
-                            }
-                            handleChange("allowFullCustomization", checked);
-                          }}
+                            onCheckedChange={(checked) => {
+                              // Si se activa la personalización completa, también activar el editor avanzado
+                              if (checked) {
+                                handleChange("useAdvancedEditor", true);
+                              }
+                              handleChange("allowFullCustomization", checked);
+                            }}
                       />
                     </div>
                   </CardContent>
@@ -1520,33 +1549,53 @@ export function PassCreator() {
                 </div>
               )}
               
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Button 
-                onClick={generateAndDownloadPass} 
+                    onClick={() => generateAndDownloadPass(false)} 
                 disabled={isGenerating || (certificateStatus ? !certificateStatus.valid : false)}
                 className="w-full"
               >
                 {isGenerating ? 'Generando...' : (
                   <>
                     <Download className="mr-2 h-4 w-4" />
-                    Descargar Pase Digital (.pkpass)
+                        Descargar (.pkpass)
                   </>
                 )}
               </Button>
               
-              {generationError && (
-                <div className="p-4 rounded-md bg-red-100 text-red-800">
-                  <p className="text-sm font-medium">Error: {generationError}</p>
+                  <Button 
+                    onClick={() => generateAndDownloadPass(true)} 
+                    disabled={isGenerating || (certificateStatus ? !certificateStatus.valid : false)}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    {isGenerating ? 'Generando...' : (
+                      <>
+                        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 17.25C9 18.7688 10.2312 20 11.75 20H12.25C13.7688 20 15 18.7688 15 17.25V6.75C15 5.23122 13.7688 4 12.25 4H11.75C10.2312 4 9 5.23122 9 6.75V17.25Z" fill="currentColor"/>
+                          <path d="M4.5 13C4.5 14.3807 5.61929 15.5 7 15.5C8.38071 15.5 9.5 14.3807 9.5 13V11C9.5 9.61929 8.38071 8.5 7 8.5C5.61929 8.5 4.5 9.61929 4.5 11V13Z" fill="currentColor"/>
+                          <path d="M14.5 11C14.5 9.61929 15.6193 8.5 17 8.5C18.3807 8.5 19.5 9.61929 19.5 11V13C19.5 14.3807 18.3807 15.5 17 15.5C15.6193 15.5 14.5 14.3807 14.5 13V11Z" fill="currentColor"/>
+                        </svg>
+                        Instalar en Wallet
+                      </>
+                    )}
+                  </Button>
                 </div>
-              )}
-              </div>
-            </div>
-          </div>
-
+                
+                {generationError && (
+                  <div className="p-4 rounded-md bg-red-100 text-red-800">
+                    <p className="text-sm font-medium">Error: {generationError}</p>
+                        </div>
+                      )}
+                            </div>
+                            </div>
+                          </div>
+                          
           <div className="hidden md:block">
             <div className="sticky top-24 w-full">
               <h3 className="text-xl font-semibold mb-6 text-center">Vista Previa del Pase</h3>
-            {passData.useAdvancedEditor ? (
-              <div className="space-y-4 w-full">
+              {passData.useAdvancedEditor ? (
+                <div className="space-y-4 w-full">
                   <AdvancedPassEditor 
                     backgroundColor={passData.backgroundColor}
                     width={passData.customWidth} 
@@ -1555,14 +1604,14 @@ export function PassCreator() {
                     setElements={setFreeElements}
                     selectedElement={selectedElement} 
                     setSelectedElement={setSelectedElement} 
-                            />
-                          </div>
+                              />
+                            </div>
               ) : (
                 <PassPreview passType={passType} passData={passData} />
               )}
-                            </div>
-                            </div>
                           </div>
+                          </div>
+                        </div>
                           
         {/* Vista previa móvil - solo visible en pantallas pequeñas */}
         <div className="mt-8 md:hidden">
@@ -1587,3 +1636,4 @@ export function PassCreator() {
     </section>
   )
 }
+
